@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build and package outputs
+.output/
+.wxt/
+dist/
+build/
+packed-output/
+*.zip
+
+# Testing and coverage
+coverage/
+test-results/
+playwright-report/
+.nyc_output/
+
+# Temporary and local profiles
+.tmp-profile/
+graphify-out/
+*.log
+*.tmp
+scratch/
+local-notes/
+scripts/
+docs/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
