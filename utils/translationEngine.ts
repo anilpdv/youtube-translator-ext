@@ -391,8 +391,10 @@ export async function translateDirectly(
   settings: ExtensionSettings,
   contextTitle: string = '',
   previousCue?: TranscriptSegment,
-  nextCue?: TranscriptSegment
+  nextCue?: TranscriptSegment,
+  signal?: AbortSignal,
 ): Promise<TranslatedSegment[]> {
+  signal?.throwIfAborted();
   if (!segments || segments.length === 0) return [];
 
   const {
@@ -498,6 +500,7 @@ export async function translateDirectly(
     }
   }
 
+  signal?.throwIfAborted();
   return results;
 }
 
@@ -513,8 +516,10 @@ export async function translateBatch(
   settings: ExtensionSettings,
   contextTitle: string = '',
   previousCue?: TranscriptSegment,
-  nextCue?: TranscriptSegment
+  nextCue?: TranscriptSegment,
+  signal?: AbortSignal,
 ): Promise<TranslatedSegment[]> {
+  signal?.throwIfAborted();
   if (!segments || segments.length === 0) return [];
 
   // Check if we are in a content script / browser DOM environment
@@ -536,6 +541,7 @@ export async function translateBatch(
           }
         );
       });
+      signal?.throwIfAborted();
 
       if (response && response.success && Array.isArray(response.data)) {
         return response.data;
@@ -552,7 +558,14 @@ export async function translateBatch(
   }
 
   // Direct execution (background worker, popup, or test environment)
-  return await translateDirectly(segments, settings, contextTitle, previousCue, nextCue);
+  return await translateDirectly(
+    segments,
+    settings,
+    contextTitle,
+    previousCue,
+    nextCue,
+    signal,
+  );
 }
 
 export { isBuiltinAIAvailable };

@@ -1,0 +1,43 @@
+.ai-subtitle-overlay-root {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout style paint;
+}
+
+.ai-subtitle-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 max(16px, env(safe-area-inset-left));
+  opacity: var(--ai-subtitle-text-opacity, 1);
+  font-size: calc(clamp(18px, 2.2vw, 38px) * var(--ai-subtitle-font-scale, 1));
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 95%), 0 2px 6px rgb(0 0 0 / 85%);
+}
+
+.ai-subtitle-position-bottom { bottom: max(10%, calc(48px + env(safe-area-inset-bottom))); }
+.ai-subtitle-position-middle { top: 50%; transform: translateY(-50%); }
+.ai-subtitle-position-top { top: max(8%, calc(16px + env(safe-area-inset-top))); }
+.ai-subtitle-box {
+  max-width: min(90%, 1200px);
+  padding: 0.25em 0.55em;
+  border-radius: 0.25em;
+  color: #fff;
+  background: rgb(0 0 0 / var(--ai-subtitle-background-opacity, 0.72));
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.ai-subtitle-translated { font-weight: 650; }
+.ai-subtitle-original { margin-top: 0.2em; font-size: 0.78em; font-weight: 450; opacity: 0.9; }
+.ai-subtitle-unavailable { font-style: italic; opacity: 0.88; }
+
+@media (max-width: 640px) {
+  .ai-subtitle-layer { font-size: calc(clamp(16px, 4.5vw, 26px) * var(--ai-subtitle-font-scale, 1)); }
+  .ai-subtitle-box { max-width: 96%; }
+}
