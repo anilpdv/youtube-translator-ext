@@ -1,0 +1,2 @@
+export interface HistogramSummary { readonly count: number; readonly minimum: number; readonly maximum: number; readonly average: number; readonly p50: number; readonly p95: number; readonly p99: number; }
+export interface MetricsSnapshot { readonly generatedAt: number; readonly counters: Readonly<Record<string, number>>; readonly gauges: Readonly<Record<string, number>>; readonly histograms: Readonly<Record<string, HistogramSummary>>; }

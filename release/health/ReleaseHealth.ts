@@ -1,0 +1,1 @@
+export interface ReleaseHealth { readonly channel: 'development' | 'beta' | 'stable'; readonly version: string; readonly errorRate: number; readonly completionRate: number; readonly healthy: boolean; readonly decision: 'continue' | 'pause' | 'rollback'; readonly reasons: readonly string[]; }
