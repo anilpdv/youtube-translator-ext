@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "budgets": {
+    "caption.parse.duration_ms": 250,
+    "caption.validate.duration_ms": 150,
+    "translation.plan.duration_ms": 150,
+    "rendering.cue_lookup.duration_ms": 1,
+    "popup.state_load.duration_ms": 300
+  }
+}
