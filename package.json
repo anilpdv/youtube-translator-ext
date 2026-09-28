@@ -1,6 +1,6 @@
 {
   "name": "youtube-ai-translator",
-  "description": "Real-time AI Subtitles for YouTube videos using Chrome Built-in AI, YouTube Auto-Translate, and Gemini.",
+  "description": "Translate existing YouTube captions into synchronized bilingual subtitles.",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -29,9 +29,12 @@
     "test:contracts": "vitest run tests/contracts",
     "test:integration": "vitest run tests/integration",
     "test:race": "vitest run tests/race",
-    "test:validate": "npm run compile && npm run test:unit && npm run test:contracts",
+    "test:security": "vitest run tests/security",
+    "test:performance": "vitest run tests/observability",
+    "test:validate": "npm run compile && npm run test:unit && npm run test:contracts && npm run test:security && npm run test:race",
     "test:ci": "npm run test:validate && npm run build",
     "performance:smoke": "node scripts/run-performance-suite.mjs",
+    "performance:compare": "node scripts/compare-performance-baseline.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:all": "vitest run && playwright test"

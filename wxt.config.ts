@@ -4,7 +4,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name: 'YouTube AI Subtitle Translator',
-    description: 'Ultra-fast, accurate AI translation & synchronized subtitles for YouTube videos using Chrome Built-in AI, YouTube Auto-Translate, and Gemini.',
+    description: 'Translate existing YouTube captions into synchronized bilingual subtitles.',
     version: '1.0.0',
     permissions: ['storage', 'tabs'],
     host_permissions: [

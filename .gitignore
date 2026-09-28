@@ -22,8 +22,7 @@ graphify-out/
 *.tmp
 scratch/
 local-notes/
-scripts/
-docs/
+.vitest/
 
 # OS and IDE files
 .DS_Store
