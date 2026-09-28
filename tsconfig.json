@@ -13,5 +13,5 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["entrypoints/**/*", "utils/**/*", "components/**/*", ".wxt/types/**/*", "tests/**/*"]
+  "include": ["app/**/*", "runtime/**/*", "youtube/**/*", "entrypoints/**/*", "utils/**/*", "components/**/*", ".wxt/types/**/*", "tests/**/*"]
 }
