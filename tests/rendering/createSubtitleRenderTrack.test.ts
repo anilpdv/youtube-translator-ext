@@ -45,7 +45,7 @@ const document = (completion: 'complete' | 'partial' = 'partial'): TranslationDo
 describe('createSubtitleRenderTrack', () => {
   it('preserves source cues when translation is partial', () => {
     const track = createSubtitleRenderTrack(document());
-    expect(track.cues.map((cue) => cue.translatedText)).toEqual(['Bonjour', null]);
-    expect(track.completed).toBe(false);
+    expect(track.slices.map((slice) => slice.translatedText)).toEqual(['Bonjour', null]);
+    expect(track.planningVersion).toBe('display-planning-v1');
   });
 });

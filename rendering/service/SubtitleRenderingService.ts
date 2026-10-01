@@ -1,5 +1,5 @@
 import type { TranslationDocument } from '../../translation/domain/TranslationDocument';
-import { createSubtitleRenderTrack } from '../adapters/createSubtitleRenderTrack';
+import { createSubtitleDisplayTrack } from '../adapters/createSubtitleRenderTrack';
 import type { SubtitleDisplaySettings } from '../domain/SubtitleDisplaySettings';
 import { OverlayController } from '../overlay/OverlayController';
 import { PlayerLocator } from '../player/PlayerLocator';
@@ -14,7 +14,7 @@ export class SubtitleRenderingService {
   async show(document: TranslationDocument, settings: SubtitleDisplaySettings): Promise<void> {
     await this.clear();
     const located = this.locator.locate();
-    const track = createSubtitleRenderTrack(document);
+    const track = createSubtitleDisplayTrack(document);
     this.player = new YouTubePlayerAdapter(located);
     this.overlay = new OverlayController(this.player, track, settings);
     this.overlay.start();

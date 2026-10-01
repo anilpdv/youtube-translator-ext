@@ -1,7 +1,8 @@
 import type { CaptionDocument } from '../../captions/domain/CaptionDocument';
 import type { TranslationBatch, TranslationBatchResult } from '../../translation/domain/TranslationBatch';
 import type { TranslationDocument } from '../../translation/domain/TranslationDocument';
-import { TRANSLATION_CACHE_SCHEMA_VERSION, TRANSLATION_BATCHING_VERSION } from '../domain/CacheSchemaVersion';
+import { TRANSLATION_CACHE_SCHEMA_VERSION } from '../domain/CacheSchemaVersion';
+import { TRANSLATION_BATCHING_VERSION } from '../../translation/batching/TranslationBatchingVersion';
 import type { CacheLimits } from '../domain/CacheLimits';
 import { DEFAULT_CACHE_LIMITS } from '../domain/CacheLimits';
 import type { CachedTranslationBatch } from '../domain/CachedTranslationBatch';
@@ -12,6 +13,7 @@ import { hashCaptionDocument, hashTranslationBatch } from '../hashing/CaptionDoc
 import { CacheCleanupService } from '../policy/CacheCleanupService';
 import { assertCacheRecordWithinLimits } from '../policy/CacheQuotaManager';
 import type { TranslationCacheRepository } from '../repository/TranslationCacheRepository';
+import { DISPLAY_PLANNING_VERSION } from '../../rendering/planning/DisplayPlanningVersion';
 
 export class TranslationCacheService {
   private readonly cleanup: CacheCleanupService;
@@ -39,6 +41,7 @@ export class TranslationCacheService {
       modelId: input.modelId,
       promptVersion: input.promptVersion,
       batchingVersion: TRANSLATION_BATCHING_VERSION,
+      displayPlanningVersion: DISPLAY_PLANNING_VERSION,
       sourceCaptionHash: await hashCaptionDocument(input.captionDocument),
     };
   }

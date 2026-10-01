@@ -1,67 +1,26 @@
 import type { TranslationDocument } from '../../translation/domain/TranslationDocument';
 import { RenderingError } from '../domain/RenderingError';
-import type { SubtitleRenderCue } from '../domain/SubtitleRenderCue';
-import type { SubtitleRenderTrack } from '../domain/SubtitleRenderTrack';
+import type { SubtitleDisplaySlice } from '../domain/SubtitleDisplaySlice';
+import type { SubtitleDisplayTrack } from '../domain/SubtitleDisplayTrack';
+import { SubtitleDisplayPlanner } from '../planning/SubtitleDisplayPlanner';
+import { DEFAULT_SUBTITLE_DISPLAY_PLANNER_OPTIONS } from '../planning/SubtitleDisplayPlannerOptions';
+import { DISPLAY_PLANNING_VERSION } from '../planning/DisplayPlanningVersion';
 
-export function createSubtitleRenderTrack(
-  document: TranslationDocument,
-): SubtitleRenderTrack {
-  if (document.videoId !== document.source.videoId) {
-    throw new RenderingError({
-      code: 'TRACK_VIDEO_MISMATCH',
-      message: 'The translation and caption document belong to different videos.',
-    });
-  }
-  const translations = new Map(document.cues.map((cue) => [cue.id, cue]));
-  const cues: SubtitleRenderCue[] = document.source.cues.map((sourceCue) => {
-    const translated = translations.get(sourceCue.id);
-    return {
-      id: sourceCue.id,
-      startMs: sourceCue.startMs,
-      endMs: sourceCue.endMs,
-      originalText: sourceCue.text,
-      translatedText: translated?.translatedText ?? null,
-      sourceLanguage: document.sourceLanguage,
-      targetLanguage: document.targetLanguage,
-    };
-  });
-  validateRenderCues(cues);
-  return {
-    sessionId: document.sessionId,
-    videoId: document.videoId,
-    sourceLanguage: document.sourceLanguage,
-    targetLanguage: document.targetLanguage,
-    cues,
-    durationMs: document.source.durationMs,
-    completed: document.completion === 'complete',
-  };
-}
-
-function validateRenderCues(cues: readonly SubtitleRenderCue[]): void {
-  let previousStart = -1;
-  const ids = new Set<string>();
-  for (const [index, cue] of cues.entries()) {
-    if (
-      !cue.id ||
-      ids.has(cue.id) ||
-      !Number.isFinite(cue.startMs) ||
-      !Number.isFinite(cue.endMs) ||
-      cue.endMs <= cue.startMs
-    ) {
-      throw new RenderingError({
-        code: 'INVALID_RENDER_TRACK',
-        message: 'The subtitle track contains an invalid cue.',
-        details: { cueId: cue.id, cueIndex: index },
-      });
+export function createSubtitleDisplayTrack(document: TranslationDocument, planner = new SubtitleDisplayPlanner(DEFAULT_SUBTITLE_DISPLAY_PLANNER_OPTIONS)): SubtitleDisplayTrack {
+  if (document.videoId !== document.source.videoId) throw new RenderingError({ code: 'TRACK_VIDEO_MISMATCH', message: 'The translation and caption document belong to different videos.' });
+  const slices: SubtitleDisplaySlice[] = [];
+  for (const sourceCue of document.source.cues) {
+    for (const planned of planner.plan({ sourceCue, translatedCues: document.cues.filter((cue) => (cue.parentCueId ?? cue.id) === sourceCue.id), sourceLanguage: document.sourceLanguage, targetLanguage: document.targetLanguage })) {
+      const previous = slices.at(-1);
+      const startMs = Math.max(planned.startMs, previous?.endMs ?? 0);
+      if (planned.endMs > startMs) slices.push({ ...planned, startMs });
     }
-    if (cue.startMs < previousStart) {
-      throw new RenderingError({
-        code: 'INVALID_RENDER_TRACK',
-        message: 'The subtitle track is not ordered.',
-        details: { cueId: cue.id, cueIndex: index },
-      });
-    }
-    ids.add(cue.id);
-    previousStart = cue.startMs;
   }
+  let previousEnd = -1; const ids = new Set<string>();
+  for (const slice of slices) {
+    if (!slice.id || ids.has(slice.id) || slice.endMs <= slice.startMs || slice.startMs < previousEnd) throw new RenderingError({ code: 'INVALID_RENDER_TRACK', message: 'The subtitle display plan is invalid.' });
+    ids.add(slice.id); previousEnd = slice.endMs;
+  }
+  return { sessionId: document.sessionId, videoId: document.videoId, sourceLanguage: document.sourceLanguage, targetLanguage: document.targetLanguage, slices, durationMs: document.source.durationMs, planningVersion: DISPLAY_PLANNING_VERSION };
 }
+export const createSubtitleRenderTrack = createSubtitleDisplayTrack;

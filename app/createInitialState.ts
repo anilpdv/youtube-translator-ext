@@ -2,7 +2,7 @@ import type { SessionState } from './SessionState';
 import { DEFAULT_SUBTITLE_DISPLAY_SETTINGS } from '../rendering/domain/SubtitleDisplaySettings';
 
 export interface InitialStateOptions {
-  subtitlesEnabled: boolean;
+  subtitlesEnabled?: boolean;
 }
 
 export function createInitialState(
@@ -16,7 +16,7 @@ export function createInitialState(
     sourceTrack: [],
     translatedTrack: [],
     activeCueIndex: -1,
-    subtitlesEnabled: options.subtitlesEnabled,
+    subtitlesEnabled: options.subtitlesEnabled ?? false,
     transcriptPanelOpen: false,
     progress: {
       completedBatches: 0,
@@ -35,5 +35,6 @@ export function createInitialState(
     subtitleDisplay: DEFAULT_SUBTITLE_DISPLAY_SETTINGS,
     activeRenderedCueId: null,
     renderingActive: false,
+    activation: { requested: false, source: null, requestedAt: null },
   };
 }
