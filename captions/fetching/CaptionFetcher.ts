@@ -14,7 +14,6 @@ export class CaptionFetcher {
 
   async fetch(track: CaptionTrack, signal?: AbortSignal): Promise<CaptionResponse> {
     signal?.throwIfAborted();
-    const url = this.createCaptionUrl(track);
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
       () => timeoutController.abort('Caption request timed out.'),
@@ -22,58 +21,69 @@ export class CaptionFetcher {
     );
     const combinedSignal = this.combineSignals(signal, timeoutController.signal);
     try {
-      const response = await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-        signal: combinedSignal,
-      });
-      if (!response.ok) {
-        throw new CaptionError({
-          code: 'CAPTION_REQUEST_FAILED',
-          message: `Caption request failed with status ${response.status}.`,
-          retryable: response.status >= 500 || response.status === 429,
-          details: { status: response.status },
+      let lastEmpty: CaptionError | null = null;
+      for (const format of this.formatCandidates(track)) {
+        const url = this.createCaptionUrl(track, format);
+        const response = await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          signal: combinedSignal,
         });
-      }
-      const declaredLength = Number(response.headers.get('content-length'));
-      if (
-        Number.isFinite(declaredLength) &&
-        declaredLength > this.options.limits.maxResponseBytes
-      ) {
-        throw new CaptionError({
-          code: 'CAPTION_RESPONSE_TOO_LARGE',
-          message: 'The caption response exceeds the allowed size.',
-          details: { declaredLength },
-        });
-      }
-      const body = await response.text();
-      signal?.throwIfAborted();
-      const byteLength = new TextEncoder().encode(body).byteLength;
-      if (byteLength > this.options.limits.maxResponseBytes) {
-        throw new CaptionError({
-          code: 'CAPTION_RESPONSE_TOO_LARGE',
-          message: 'The caption response exceeds the allowed size.',
-          details: { byteLength },
-        });
-      }
-      if (!body.trim()) {
-        throw new CaptionError({
-          code: 'CAPTION_RESPONSE_EMPTY',
-          message: 'YouTube returned an empty caption response.',
-          retryable: true,
-        });
-      }
-      const contentType = response.headers.get('content-type');
-      return {
-        body,
-        contentType,
-        byteLength,
-        format: detectCaptionFormat({
+        if (!response.ok) {
+          throw new CaptionError({
+            code: 'CAPTION_REQUEST_FAILED',
+            message: `Caption request failed with status ${response.status}.`,
+            retryable: response.status >= 500 || response.status === 429,
+            details: { status: response.status, format },
+          });
+        }
+        const declaredLength = Number(response.headers.get('content-length'));
+        if (
+          Number.isFinite(declaredLength) &&
+          declaredLength > this.options.limits.maxResponseBytes
+        ) {
+          throw new CaptionError({
+            code: 'CAPTION_RESPONSE_TOO_LARGE',
+            message: 'The caption response exceeds the allowed size.',
+            details: { declaredLength, format },
+          });
+        }
+        const body = await response.text();
+        signal?.throwIfAborted();
+        const byteLength = new TextEncoder().encode(body).byteLength;
+        if (byteLength > this.options.limits.maxResponseBytes) {
+          throw new CaptionError({
+            code: 'CAPTION_RESPONSE_TOO_LARGE',
+            message: 'The caption response exceeds the allowed size.',
+            details: { byteLength, format },
+          });
+        }
+        if (!body.trim()) {
+          lastEmpty = new CaptionError({
+            code: 'CAPTION_RESPONSE_EMPTY',
+            message: 'YouTube returned an empty caption response.',
+            retryable: true,
+            details: { format },
+          });
+          continue;
+        }
+        const contentType = response.headers.get('content-type');
+        return {
           body,
           contentType,
-          requestedFormat: track.formatHint,
-        }),
-      };
+          byteLength,
+          format: detectCaptionFormat({
+            body,
+            contentType,
+            requestedFormat: format,
+          }),
+        };
+      }
+      throw lastEmpty ?? new CaptionError({
+        code: 'CAPTION_RESPONSE_EMPTY',
+        message: 'YouTube returned an empty caption response.',
+        retryable: true,
+      });
     } catch (error) {
       if (error instanceof CaptionError) throw error;
       if (signal?.aborted) {
@@ -102,7 +112,12 @@ export class CaptionFetcher {
     }
   }
 
-  private createCaptionUrl(track: CaptionTrack): URL {
+  private formatCandidates(track: CaptionTrack): readonly string[] {
+    const preferred = track.formatHint ?? 'json3';
+    return [...new Set([preferred, 'json3', 'srv3', 'webvtt'])];
+  }
+
+  private createCaptionUrl(track: CaptionTrack, format: string): URL {
     let url: URL;
     try {
       url = new URL(track.baseUrl);
@@ -127,7 +142,9 @@ export class CaptionFetcher {
         details: { protocol: url.protocol, hostname: url.hostname },
       });
     }
-    if (!track.formatHint) url.searchParams.set('fmt', 'json3');
+    // YouTube calls WebVTT "vtt" in timed-text URLs, while the domain model
+    // uses "webvtt" for the parsed format.
+    url.searchParams.set('fmt', format === 'webvtt' ? 'vtt' : format);
     return url;
   }
 
