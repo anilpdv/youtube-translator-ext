@@ -34,22 +34,17 @@ export class Json3CaptionParser implements CaptionParser {
       };
       const startMs = this.numberValue(event.tStartMs);
       const durationMs = this.numberValue(event.dDurationMs);
-      const text = Array.isArray(event.segs)
-        ? event.segs
-            .map((segment) =>
-              typeof segment === 'object' &&
-              segment !== null &&
-              typeof (segment as { utf8?: unknown }).utf8 === 'string'
-                ? (segment as { utf8: string }).utf8
-                : '',
-            )
-            .join('')
-        : '';
+      const segments = this.readSegments(event.segs);
+      const text = segments.map((segment) => segment.text).join('').trim();
       if (startMs === null || !text.trim()) continue;
       cues.push({
         startMs,
-        durationMs: durationMs ?? undefined,
+        durationMs,
+        endMs: durationMs === null ? null : startMs + durationMs,
         text,
+        segments,
+        sourceBehavior: segments.some((segment) => segment.offsetMs !== null)
+          ? 'segmented' : 'static',
       });
     }
     if (cues.length === 0) {
@@ -59,6 +54,18 @@ export class Json3CaptionParser implements CaptionParser {
       });
     }
     return cues;
+  }
+
+  private readSegments(value: unknown) {
+    if (!Array.isArray(value)) return [];
+    return value.map((entry) => {
+      const segment = entry as { utf8?: unknown; tOffsetMs?: unknown };
+      const text = typeof segment?.utf8 === 'string' ? segment.utf8 : '';
+      const rawOffset = segment?.tOffsetMs;
+      const offsetMs = typeof rawOffset === 'number' && Number.isFinite(rawOffset)
+        ? Math.max(0, Math.round(rawOffset)) : null;
+      return { text, offsetMs };
+    }).filter((segment) => segment.text.length > 0);
   }
 
   private numberValue(value: unknown): number | null {
