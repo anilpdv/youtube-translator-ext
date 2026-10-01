@@ -1,0 +1,1 @@
+export type RollingRelationship =  | 'same'  | 'extension'  | 'overlap'  | 'replacement'  | 'unrelated';export interface RollingDelta {  readonly text: string;  readonly relationship:    RollingRelationship;  readonly overlapTokenCount:    number;  readonly overlapRatio:    number;}
