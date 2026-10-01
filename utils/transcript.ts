@@ -339,6 +339,83 @@ export function wrapSubtitleText(
   return lines.slice(0, maxLines);
 }
 
+/**
+ * Splits a subtitle into display pages without dropping any text. Each page
+ * contains at most `maxLines` lines and each line respects the configured
+ * character limit. This is used at render time so exports and cue identity
+ * remain unchanged while long YouTube transcript rows stay readable.
+ */
+export function paginateSubtitleText(
+  text: string,
+  maxLines = 2,
+  maxCharsPerLine = 42,
+  maxCJKCharsPerLine = 20,
+): string[] {
+  const normalized = (text || '').replace(/\r/g, '').trim();
+  if (!normalized) return [];
+
+  const safeMaxLines = Math.max(1, Math.floor(maxLines) || 1);
+  const maxChars = isCJKText(normalized)
+    ? Math.max(1, Math.floor(maxCJKCharsPerLine) || 20)
+    : Math.max(1, Math.floor(maxCharsPerLine) || 42);
+  const lines: string[] = [];
+
+  for (const paragraph of normalized.split('\n')) {
+    const value = paragraph.trim();
+    if (!value) continue;
+
+    if (isCJKText(value)) {
+      let current = '';
+      for (const character of value) {
+        if (current.length >= maxChars) {
+          lines.push(current);
+          current = '';
+        }
+        current += character;
+      }
+      if (current) lines.push(current);
+      continue;
+    }
+
+    let current = '';
+    for (const word of value.split(/\s+/).filter(Boolean)) {
+      // Keep an unusually long token from creating a line wider than the
+      // configured limit.
+      if (word.length > maxChars) {
+        if (current) {
+          lines.push(current);
+          current = '';
+        }
+        for (let offset = 0; offset < word.length; offset += maxChars) {
+          const piece = word.slice(offset, offset + maxChars);
+          if (piece.length === maxChars || offset + maxChars < word.length) {
+            lines.push(piece);
+          } else {
+            current = piece;
+          }
+        }
+        continue;
+      }
+
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length > maxChars && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current) lines.push(current);
+  }
+
+  if (lines.length === 0) return [normalized];
+  const pages: string[] = [];
+  for (let index = 0; index < lines.length; index += safeMaxLines) {
+    pages.push(lines.slice(index, index + safeMaxLines).join('\n'));
+  }
+  return pages;
+}
+
 export const LANGUAGE_NAME_TO_CODE: Record<string, string> = {
   english: 'en',
   spanish: 'es',
@@ -857,6 +934,10 @@ export async function fetchAndParseTimedText(
     if (isSuccess) {
       console.log(
         `[AI Subtitles] Caption request OK: status=${response.status} format=${format} bytes=${body.length} parsedCues=${segments.length}`
+      );
+    } else if (response.ok && body.length === 0) {
+      console.info(
+        `[AI Subtitles] Caption response was empty; falling back to transcript DOM: status=${response.status} format=${format} bytes=0 parsedCues=0`
       );
     } else {
       console.warn(
@@ -1378,7 +1459,9 @@ export async function fetchDirectYouTubeCaptions(
     }
 
     if (translatedRaw.length === 0 && originalRaw.length === 0) {
-      console.warn('[AI Subtitles] ⚠️ Both translated & original timedtext returned empty across formats.');
+      console.info(
+        '[AI Subtitles] Direct timed-text captions are unavailable; using the transcript panel fallback.'
+      );
       return [];
     }
 

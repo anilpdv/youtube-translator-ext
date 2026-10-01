@@ -8,6 +8,7 @@ interface Props {
   settings: ExtensionSettings;
   isTranslating: boolean;
   hasSubtitles?: boolean;
+  subtitlesEnabled?: boolean;
   isTranscriptOpen?: boolean;
   onToggleSubs: () => void;
   onToggleTranscript?: () => void;
@@ -18,6 +19,7 @@ export const InPlayerControls: React.FC<Props> = ({
   settings,
   isTranslating,
   hasSubtitles = false,
+  subtitlesEnabled,
   isTranscriptOpen = false,
   onToggleSubs,
   onToggleTranscript,
@@ -25,6 +27,7 @@ export const InPlayerControls: React.FC<Props> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
+  const isSubtitlesEnabled = subtitlesEnabled ?? settings.autoTranslate;
 
   useEffect(() => {
     const handleOutsideClick = (e: PointerEvent) => {
@@ -78,12 +81,12 @@ export const InPlayerControls: React.FC<Props> = ({
       <button
         type="button"
         aria-label="AI Subtitles"
-        aria-pressed={settings.autoTranslate}
+        aria-pressed={isSubtitlesEnabled}
         onClick={onToggleSubs}
         style={{
           ...buttonStyle,
-          borderColor: settings.autoTranslate ? '#2a8b70' : 'rgba(255, 255, 255, 0.16)',
-          background: settings.autoTranslate ? 'rgba(22, 101, 82, 0.72)' : 'rgba(12, 17, 21, 0.86)',
+          borderColor: isSubtitlesEnabled ? '#2a8b70' : 'rgba(255, 255, 255, 0.16)',
+          background: isSubtitlesEnabled ? 'rgba(22, 101, 82, 0.72)' : 'rgba(12, 17, 21, 0.86)',
         }}
       >
         {isTranslating ? (

@@ -16,6 +16,11 @@ import { translateBatch } from '../utils/translationEngine';
 import { findActiveCue, RunGuard } from '../utils/subtitleRuntime';
 import { SafeRootRenderer } from '../utils/safeRootRenderer';
 import {
+  createEstimatedTimedTextUnits,
+  DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS,
+  SubtitlePhraseCardPlanner,
+} from '../rendering/planning/SubtitlePhraseCardPlanner';
+import {
   extractFullTranscriptFromDOM,
   fetchDirectYouTubeCaptions,
   collapseRepeatedText,
@@ -47,6 +52,7 @@ export default defineContentScript({
       sourceTrack: [] as TranscriptSegment[],
       track: [] as TranslatedSegment[],
       activeIndex: -1,
+      currentTime: 0,
       subtitlesEnabled: false,
       transcriptPanelOpen: false,
       error: undefined as string | undefined,
@@ -77,6 +83,45 @@ export default defineContentScript({
     let isTranslatingQueue = false;
 
     // ─── Helpers: Notify popup & Update Native Captions ───────────────────────
+
+    const createPhraseCardTrack = (track: TranslatedSegment[]): TranslatedSegment[] => {
+      if (track.length === 0) return [];
+
+      const planner = new SubtitlePhraseCardPlanner({
+        ...DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS,
+        maximumCharactersPerLine: Math.min(42, settings.subtitleMaxCharactersPerLine || 42),
+        maximumLines: Math.min(2, settings.subtitleMaxLines || 2),
+      });
+      const units = track.flatMap((segment, index) =>
+        createEstimatedTimedTextUnits({
+          idPrefix: segment.id || `cue-${index}`,
+          parentCueId: segment.id || `cue-${index}`,
+          startMs: Math.round(segment.start * 1000),
+          endMs: Math.round((segment.start + segment.dur) * 1000),
+          text: segment.translatedText || segment.text,
+        }),
+      );
+
+      if (units.length === 0) return track;
+
+      const cards = planner.plan({
+        units,
+        sourceLanguage: settings.targetLanguage,
+        targetLanguage: settings.targetLanguage,
+        timingSource: 'estimated',
+        idPrefix: `${runtimeState.videoId || 'video'}:phrase`,
+      });
+
+      return cards.map((card) => ({
+        id: card.id,
+        start: card.startMs / 1000,
+        dur: Math.max(0.1, (card.endMs - card.startMs) / 1000),
+        text: card.originalText,
+        translatedText: card.translatedText || card.originalText,
+        source: 'timedtext',
+        translationStatus: 'translated',
+      }));
+    };
 
     const broadcastState = () => {
       try {
@@ -201,9 +246,33 @@ export default defineContentScript({
             settings={settings}
             isTranslating={isTranslating}
             hasSubtitles={runtimeState.track.length > 0}
+            subtitlesEnabled={runtimeState.subtitlesEnabled}
             isTranscriptOpen={runtimeState.transcriptPanelOpen}
             onToggleSubs={() => {
+              const currentVideoId = runtimeState.videoId;
+
+              // The in-player control is also the primary activation point. If
+              // no track has been loaded yet, start the same guarded pipeline
+              // used by the popup instead of merely toggling an empty overlay.
+              if (
+                runtimeState.track.length === 0 &&
+                runtimeState.phase !== 'extracting' &&
+                runtimeState.phase !== 'translating' &&
+                currentVideoId
+              ) {
+                runtimeState.subtitlesEnabled = true;
+                settings = { ...settings, autoTranslate: true };
+                saveSettings({ autoTranslate: true });
+                renderControls();
+                renderOverlay();
+                void startTranslation(currentVideoId).catch((error) => {
+                  console.warn('[AI Subtitles] In-player activation failed:', error);
+                });
+                return;
+              }
+
               runtimeState.subtitlesEnabled = !runtimeState.subtitlesEnabled;
+              settings = { ...settings, autoTranslate: runtimeState.subtitlesEnabled };
               saveSettings({ autoTranslate: runtimeState.subtitlesEnabled });
               updateNativeCaptionVisibility();
               renderControls();
@@ -346,6 +415,7 @@ export default defineContentScript({
         if (!videoEl) return;
 
         if (currentVideoEl === videoEl && boundTimeUpdateListener && boundSeekingListener) {
+          boundTimeUpdateListener();
           return;
         }
 
@@ -359,6 +429,7 @@ export default defineContentScript({
           try {
             if (runtimeState.track.length === 0) return;
             const t = videoEl.currentTime;
+            runtimeState.currentTime = t;
             const nextIndex = findActiveCue(
               runtimeState.track,
               t,
@@ -368,7 +439,6 @@ export default defineContentScript({
 
             if (nextIndex !== runtimeState.activeIndex) {
               runtimeState.activeIndex = nextIndex;
-              renderOverlay();
               if (runtimeState.transcriptPanelOpen) {
                 renderTranscript();
               }
@@ -382,6 +452,7 @@ export default defineContentScript({
           try {
             if (runtimeState.track.length === 0) return;
             const t = videoEl.currentTime;
+            runtimeState.currentTime = t;
             runtimeState.activeIndex = findActiveCue(
               runtimeState.track,
               t,
@@ -399,6 +470,11 @@ export default defineContentScript({
 
         videoEl.addEventListener('timeupdate', boundTimeUpdateListener);
         videoEl.addEventListener('seeking', boundSeekingListener);
+
+        // A track can finish loading while the player is paused or between
+        // native timeupdate events. Synchronize once immediately so the first
+        // cue is rendered without requiring the user to seek or resume.
+        boundTimeUpdateListener();
       } catch (err) {
         console.warn('[AI Subtitles] Error setting up video listeners:', err);
       }
@@ -432,6 +508,7 @@ export default defineContentScript({
       runtimeState.sourceTrack = [];
       runtimeState.track = [];
       runtimeState.activeIndex = -1;
+      runtimeState.currentTime = 0;
       runtimeState.error = undefined;
       broadcastState();
       renderOverlay();
@@ -444,6 +521,7 @@ export default defineContentScript({
       }
 
       let rawSegments: TranscriptSegment[] = [];
+      let translatedSegments: TranslatedSegment[] = [];
 
       // ── Priority 1: YouTube direct pre-translated tracks (if provider is youtube) ──
       if (settings.provider === 'youtube') {
@@ -473,13 +551,14 @@ export default defineContentScript({
             text: d.text,
             source: d.source,
           }));
-          runtimeState.track = directTracks;
+          translatedSegments = [...directTracks];
+          runtimeState.track = createPhraseCardTrack(translatedSegments);
           runtimeState.translatedCount = directTracks.length;
           runtimeState.totalCount = directTracks.length;
           runtimeState.phase = 'ready';
           runtimeState.message = `✨ Subtitles ready (${directTracks.length} cues)`;
 
-          logTrackStage('Extracted & Translated (YouTube Direct)', runtimeState.track);
+          logTrackStage('Extracted & Translated (YouTube Direct)', translatedSegments);
 
           updateNativeCaptionVisibility();
           setupVideoListeners();
@@ -561,12 +640,13 @@ export default defineContentScript({
 
         if (!runGuard.valid(runId)) return;
 
-        runtimeState.track = [...initialTranslated];
-        runtimeState.translatedCount = initialTranslated.length;
+        translatedSegments = [...initialTranslated];
+        runtimeState.track = createPhraseCardTrack(translatedSegments);
+        runtimeState.translatedCount = translatedSegments.length;
         runtimeState.phase = total <= INITIAL_BATCH ? 'ready' : 'partial';
         runtimeState.message = `✨ Ready (${runtimeState.translatedCount}/${total} translated)`;
 
-        logTrackStage('Translated (Initial Batch)', runtimeState.track);
+        logTrackStage('Translated (Initial Batch)', translatedSegments);
 
         updateNativeCaptionVisibility();
         setupVideoListeners();
@@ -593,13 +673,14 @@ export default defineContentScript({
                 );
                 if (!runGuard.valid(runId)) return;
 
-                runtimeState.track.push(...chunk);
-                runtimeState.translatedCount = runtimeState.track.length;
+                translatedSegments.push(...chunk);
+                runtimeState.track = createPhraseCardTrack(translatedSegments);
+                runtimeState.translatedCount = translatedSegments.length;
                 runtimeState.phase = runtimeState.translatedCount >= total ? 'ready' : 'partial';
                 runtimeState.message = `Subtitles (${runtimeState.translatedCount}/${total} cues)`;
 
                 if (runtimeState.phase === 'ready') {
-                  logTrackStage('Translated (Complete Track)', runtimeState.track);
+                  logTrackStage('Translated (Complete Track)', translatedSegments);
                 }
 
                 renderControls();
@@ -774,6 +855,7 @@ export default defineContentScript({
         runtimeState.sourceTrack = [];
         runtimeState.track = [];
         runtimeState.activeIndex = -1;
+        runtimeState.currentTime = 0;
         runtimeState.translatedCount = 0;
         runtimeState.totalCount = 0;
         runtimeState.error = undefined;
@@ -815,8 +897,23 @@ export default defineContentScript({
 
         if (seq !== finishSequence) return;
 
-        // Navigation only records the video. UI mounting, caption extraction,
-        // live observation and provider work require an explicit command.
+        // YouTube can attach the player before it attaches the control bar.
+        // Wait briefly for the right-side control host so the AI Subs pill is
+        // mounted reliably after SPA navigation and player recycling.
+        for (let i = 0; i < 30; i++) {
+          if (seq !== finishSequence) return;
+          if (document.querySelector('.ytp-right-controls')) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+
+        if (seq !== finishSequence) return;
+
+        setupVideoListeners();
+        renderControls();
+
+        // Caption extraction and provider work remain explicit, but the
+        // in-player control stays available so the user can start the pipeline
+        // without opening the popup.
         runtimeState.phase = 'idle';
         runtimeState.message = 'Video detected. Open the extension to translate subtitles.';
         runtimeState.subtitlesEnabled = false;

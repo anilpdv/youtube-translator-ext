@@ -1,1 +1,15 @@
-export type DisplayTimingSource =  | 'exact-segment'  | 'rolling-delta'  | 'estimated';export interface SubtitleDisplaySlice {  readonly id: string;  readonly parentCueId:    string;  readonly sliceIndex:    number;  readonly startMs:    number;  readonly endMs:    number;  readonly originalText:    string;  readonly translatedText:    string | null;  readonly sourceLanguage:    string;  readonly targetLanguage:    string;  readonly timingSource:    DisplayTimingSource;  readonly cumulativeWindow:    boolean;}
+export type DisplayTimingSource = 'exact-segment' | 'rolling-delta' | 'estimated' | 'word-timing' | 'cue-timing';
+
+export interface SubtitleDisplaySlice {
+  readonly id: string;
+  readonly parentCueId: string;
+  readonly sliceIndex: number;
+  readonly startMs: number;
+  readonly endMs: number;
+  readonly originalText: string;
+  readonly translatedText: string | null;
+  readonly sourceLanguage: string;
+  readonly targetLanguage: string;
+  readonly timingSource: DisplayTimingSource;
+  readonly cumulativeWindow: boolean;
+}

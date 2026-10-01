@@ -1,1 +1,23 @@
-export interface SubtitleDisplayPlannerOptions {  readonly maxLines:    number;  readonly maxCharactersPerLine:    number;  readonly maxWordsPerSlice:    number;  readonly minimumSliceDurationMs:    number;  readonly preferredSliceDurationMs:    number;  readonly maximumSliceDurationMs:    number;  readonly rollingWindowSize:    number;}export const DEFAULT_SUBTITLE_DISPLAY_PLANNER_OPTIONS:  SubtitleDisplayPlannerOptions = {    maxLines: 2,    maxCharactersPerLine: 42,    maxWordsPerSlice: 10,    minimumSliceDurationMs: 900,    preferredSliceDurationMs:      1_800,    maximumSliceDurationMs:      4_000,    rollingWindowSize: 2,  };
+import type { SubtitlePhraseCardPlannerOptions } from './SubtitlePhraseCardPlanner';
+import { DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS } from './SubtitlePhraseCardPlanner';
+
+export interface SubtitleDisplayPlannerOptions extends SubtitlePhraseCardPlannerOptions {
+  readonly maxLines: number;
+  readonly maxCharactersPerLine: number;
+  readonly maxWordsPerSlice: number;
+  readonly minimumSliceDurationMs: number;
+  readonly preferredSliceDurationMs: number;
+  readonly maximumSliceDurationMs: number;
+  readonly rollingWindowSize: number;
+}
+
+export const DEFAULT_SUBTITLE_DISPLAY_PLANNER_OPTIONS: SubtitleDisplayPlannerOptions = {
+  ...DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS,
+  maxLines: DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS.maximumLines,
+  maxCharactersPerLine: DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS.maximumCharactersPerLine,
+  maxWordsPerSlice: DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS.maximumWordsPerCard,
+  minimumSliceDurationMs: DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS.minimumCardDurationMs,
+  preferredSliceDurationMs: DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS.preferredCardDurationMs,
+  maximumSliceDurationMs: DEFAULT_SUBTITLE_PHRASE_CARD_OPTIONS.maximumCardDurationMs,
+  rollingWindowSize: 1,
+};

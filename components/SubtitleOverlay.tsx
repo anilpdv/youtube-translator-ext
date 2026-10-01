@@ -7,6 +7,7 @@ interface Props {
   settings: ExtensionSettings;
   statusText?: string;
   statusKind?: 'info' | 'success' | 'error';
+  currentTime?: number;
 }
 
 const clamp = (val: number | undefined, min: number, max: number, defaultVal: number): number => {
@@ -35,6 +36,43 @@ const getTextShadow = (type: 'none' | 'soft' | 'strong' = 'strong'): string => {
   }
 };
 
+const getAlignmentItems = (alignment: ExtensionSettings['subtitleAlignment']): React.CSSProperties['alignItems'] => {
+  switch (alignment) {
+    case 'center':
+      return 'center';
+    case 'left':
+    default:
+      return 'flex-start';
+  }
+};
+
+const wrapStableCaptionText = (text: string, maxLines: number, maxCharactersPerLine: number): string[] => {
+  if (text.includes('\n')) {
+    const explicitLines = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (explicitLines.length > 0) return explicitLines.slice(0, Math.max(1, maxLines));
+  }
+
+  const lines: string[] = [];
+  let current = '';
+  const safeMaxChars = Math.max(1, maxCharactersPerLine);
+
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (current && candidate.length > safeMaxChars) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines.slice(0, Math.max(1, maxLines));
+};
+
 export const SubtitleOverlay: React.FC<Props> = ({
   currentSegment,
   settings,
@@ -46,6 +84,17 @@ export const SubtitleOverlay: React.FC<Props> = ({
   const pos: React.CSSProperties = isTop
     ? { top: `${72 + vOffset}px`, bottom: 'auto' }
     : { bottom: `${76 - vOffset}px`, top: 'auto' };
+  const fontFamily = 'Roboto, YouTube Noto, system-ui, -apple-system, sans-serif';
+  const fontSize = clamp(settings.subtitleFontSize, 14, 48, 24);
+  const lineHeight = clamp(settings.subtitleLineHeight, 1.1, 1.8, 1.3);
+  const maxWidth = clamp(settings.subtitleMaxWidth, 40, 100, 82);
+  const bgOpacity = clamp(settings.subtitleBackgroundOpacity, 0, 1, 0.75);
+  const originalScale = clamp(settings.bilingualOriginalScale, 0.4, 1.0, 0.78);
+  const originalOpacity = clamp(settings.bilingualOriginalOpacity, 0.2, 1.0, 0.72);
+  const originalFontSize = Math.max(12, Math.round(fontSize * originalScale));
+  const fontWeight = settings.subtitleFontWeight || 600;
+  const originalFontWeight = Math.max(400, fontWeight - 100);
+  const alignItems = getAlignmentItems(settings.subtitleAlignment);
 
   if (statusText) {
     const borderColor =
@@ -93,58 +142,78 @@ export const SubtitleOverlay: React.FC<Props> = ({
     return null;
   }
 
-  const translated =
+  const translatedSource =
     isSound && settings.subtitleSoundLabels === 'original-only'
       ? currentSegment.text
       : currentSegment.translatedText?.trim();
 
-  if (!translated) return null;
+  if (!translatedSource) return null;
 
+  const translated = translatedSource;
   const originalText = currentSegment.text?.trim();
   const showBilingual = settings.subtitleBilingual && originalText && originalText !== translated;
-  const fontSize = clamp(settings.subtitleFontSize, 14, 48, 24);
-  const lineHeight = clamp(settings.subtitleLineHeight, 1.1, 1.8, 1.3);
-  const maxWidth = clamp(settings.subtitleMaxWidth, 40, 100, 82);
-  const bgOpacity = clamp(settings.subtitleBackgroundOpacity, 0, 1, 0.75);
-  const originalScale = clamp(settings.bilingualOriginalScale, 0.4, 1.0, 0.78);
-  const originalOpacity = clamp(settings.bilingualOriginalOpacity, 0.2, 1.0, 0.72);
-  const originalFontSize = Math.max(12, Math.round(fontSize * originalScale));
   const isOriginalFirst = settings.bilingualOrder === 'original-first';
 
-  const originalElement = showBilingual ? (
-    <span
-      key="orig"
-      style={{
-        fontSize: `${originalFontSize}px`,
-        lineHeight,
-        fontWeight: Math.max(400, (settings.subtitleFontWeight || 600) - 100),
-        color: settings.subtitleFontColor || '#ffffff',
-        opacity: originalOpacity,
-        textShadow: getTextShadow(settings.subtitleTextShadow),
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-      }}
-    >
-      {originalText}
-    </span>
-  ) : null;
+  const captionLineStyle = (size: number, weight: number, opacity = 1): React.CSSProperties => ({
+    display: 'block',
+    overflow: 'hidden',
+    maxWidth: '100%',
+    whiteSpace: 'nowrap',
+    textOverflow: 'clip',
+    textAlign: settings.subtitleAlignment || 'center',
+    fontSize: `${size}px`,
+    lineHeight,
+    fontWeight: weight,
+    color: settings.subtitleFontColor || '#ffffff',
+    opacity,
+    textShadow: getTextShadow(settings.subtitleTextShadow),
+    padding: '0 2px',
+    boxSizing: 'border-box',
+  });
 
-  const translatedElement = (
-    <span
-      key="trans"
-      style={{
-        fontSize: `${fontSize}px`,
-        lineHeight,
-        fontWeight: settings.subtitleFontWeight || 600,
-        color: settings.subtitleFontColor || '#ffffff',
-        textShadow: getTextShadow(settings.subtitleTextShadow),
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-      }}
-    >
-      {translated}
-    </span>
-  );
+  const renderCaptionText = (
+    text: string,
+    key: string,
+    size: number,
+    weight: number,
+    opacity = 1,
+  ) => {
+    const lines = wrapStableCaptionText(
+      text,
+      Math.min(2, settings.subtitleMaxLines || 2),
+      Math.min(42, settings.subtitleMaxCharactersPerLine || 42),
+    );
+
+    return (
+      <span
+        key={key}
+        style={{
+          display: 'inline-flex',
+          flexDirection: 'column',
+          alignItems,
+          gap: '2px',
+          maxWidth: '100%',
+          minWidth: 0,
+        }}
+      >
+        {lines.map((line, index) => (
+          <span
+            key={`${key}-${index}`}
+            data-testid="subtitle-caption-line"
+            style={captionLineStyle(size, weight, opacity)}
+          >
+            {line}
+          </span>
+        ))}
+      </span>
+    );
+  };
+
+  const originalElement = showBilingual
+    ? renderCaptionText(originalText, 'orig', originalFontSize, originalFontWeight, originalOpacity)
+    : null;
+
+  const translatedElement = renderCaptionText(translated, 'trans', fontSize, fontWeight);
 
   return (
     <div
@@ -159,21 +228,24 @@ export const SubtitleOverlay: React.FC<Props> = ({
         textAlign: settings.subtitleAlignment || 'center',
         pointerEvents: 'none',
         zIndex: 70,
-        fontFamily: 'Roboto, YouTube Noto, system-ui, -apple-system, sans-serif',
+        fontFamily,
       }}
     >
       <div
         style={{
+          width: '100%',
+          maxWidth: '100%',
           display: 'inline-flex',
           flexDirection: 'column',
-          gap: '4px',
-          maxWidth: '100%',
-          padding: '8px 16px',
-          borderRadius: '8px',
+          alignItems,
+          gap: '2px',
+          minWidth: 0,
+          minHeight: `${Math.round(fontSize * lineHeight * 2 + 12)}px`,
+          justifyContent: 'center',
+          padding: '6px 10px',
+          borderRadius: '2px',
           background: hexToRgba(settings.subtitleBackground, bgOpacity),
-          boxShadow: '0 4px 18px rgba(0, 0, 0, 0.45)',
-          backdropFilter: 'blur(4px)',
-          textAlign: settings.subtitleAlignment || 'center',
+          boxSizing: 'border-box',
         }}
       >
         {isOriginalFirst ? [originalElement, translatedElement] : [translatedElement, originalElement]}

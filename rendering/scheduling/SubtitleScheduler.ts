@@ -26,7 +26,7 @@ export class SubtitleScheduler {
 
   start(): void {
     if (this.disposed) return;
-    this.resources.use(this.player.subscribe(() => this.evaluate(true)));
+    this.resources.use(this.player.subscribe(() => this.evaluate()));
     this.evaluate(true);
   }
 

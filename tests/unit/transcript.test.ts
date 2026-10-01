@@ -30,6 +30,7 @@ import {
   mergeTranslations,
   validateExportTracks,
   wrapSubtitleText,
+  paginateSubtitleText,
   isTimedTextBlocked,
   recordTimedTextRateLimit,
   canExportFullTrack,
@@ -760,6 +761,21 @@ describe('wrapSubtitleText', () => {
   });
 });
 
+describe('paginateSubtitleText', () => {
+  it('keeps all long subtitle text while limiting each page to two lines', () => {
+    const text =
+      'Cleaned it well. I am making it now. Made yesterday also and am making it even today and it has been rejected. Her';
+    const pages = paginateSubtitleText(text, 2, 42);
+
+    expect(pages.length).toBeGreaterThan(1);
+    expect(pages.join(' ').replace(/\s+/g, ' ')).toBe(text);
+    pages.forEach((page) => {
+      expect(page.split('\n').length).toBeLessThanOrEqual(2);
+      page.split('\n').forEach((line) => expect(line.length).toBeLessThanOrEqual(42));
+    });
+  });
+});
+
 // ─── 00:01:57 Regression Fixture Test ────────────────────────────────────────
 describe('00:01:57 Regression Fixture', () => {
   it('ensures cue at 00:01:57 is parsed and translated without 11-second lag or dropping', () => {
@@ -811,5 +827,3 @@ describe('canExportFullTrack', () => {
     expect(canExportFullTrack('ready', 44, 45)).toBe(false);
   });
 });
-
-
