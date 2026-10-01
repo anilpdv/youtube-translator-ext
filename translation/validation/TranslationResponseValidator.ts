@@ -3,6 +3,7 @@ import type { TranslatedCue } from '../domain/TranslationCue';
 import type { TranslationLimits } from '../domain/TranslationLimits';
 import { TranslationError } from '../domain/TranslationError';
 import type { ProviderTranslationItem } from '../providers/ProviderResponse';
+import { detectAbnormalRepetition } from './detectAbnormalRepetition';
 
 export class TranslationResponseValidator {
   constructor(private readonly limits: TranslationLimits) {}
@@ -50,6 +51,14 @@ export class TranslationResponseValidator {
           batchId: batch.id,
         });
       }
+      const repetition = detectAbnormalRepetition({ sourceText: source.text, translatedText });
+      if (repetition.repetitive) {
+        throw new TranslationError({
+          code: 'ABNORMAL_REPETITION', message: 'The provider returned repeated subtitle content.',
+          retryable: true, batchId: batch.id,
+          details: { cueId: source.id, repeatedTokenRatio: repetition.repeatedTokenRatio, lengthRatio: repetition.translationSourceLengthRatio },
+        });
+      }
       seen.add(item.id);
     }
     for (const cue of batch.cues) {
@@ -67,6 +76,8 @@ export class TranslationResponseValidator {
       const item = items.find((candidate) => candidate.id === source.id);
       return {
         id: source.id,
+        parentCueId: source.parentCueId,
+        sliceIndex: source.sliceIndex,
         sourceText: source.text,
         translatedText: item!.translation.trim(),
         startMs: source.startMs,

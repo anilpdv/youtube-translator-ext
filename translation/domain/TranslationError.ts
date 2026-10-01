@@ -17,6 +17,7 @@ export type TranslationErrorCode =
   | 'UNKNOWN_CUE'
   | 'EMPTY_TRANSLATION'
   | 'TRANSLATION_TOO_LONG'
+  | 'ABNORMAL_REPETITION'
   | 'SESSION_CANCELLED'
   | 'RETRY_EXHAUSTED';
 

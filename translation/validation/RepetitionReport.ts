@@ -1,0 +1,1 @@
+export interface RepetitionReport {  readonly repetitive:    boolean;  readonly repeatedTokenRatio:    number;  readonly translationSourceLengthRatio:    number;  readonly repeatedPhrases:    readonly string[];}
