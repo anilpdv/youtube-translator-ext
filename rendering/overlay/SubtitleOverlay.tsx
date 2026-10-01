@@ -6,8 +6,8 @@ export interface SubtitleOverlayProps {
 }
 
 export function SubtitleOverlay({ model }: SubtitleOverlayProps): React.ReactElement | null {
-  const { cue, settings } = model;
-  if (!model.visible || !cue) return null;
+  const { slice, settings } = model;
+  if (!model.visible || !slice) return null;
   const showOriginal = settings.mode !== 'translated';
   const showTranslation = settings.mode !== 'original';
   return (
@@ -20,20 +20,20 @@ export function SubtitleOverlay({ model }: SubtitleOverlayProps): React.ReactEle
         '--ai-subtitle-text-opacity': String(settings.textOpacity),
       } as React.CSSProperties}
     >
-      <div className="ai-subtitle-box" role="status">
-        {showTranslation && cue.translatedText ? (
-          <div className="ai-subtitle-translated" lang={cue.targetLanguage} dir="auto">
-            {cue.translatedText}
+      <div className="ai-subtitle-box" role="status" aria-live="polite" aria-atomic="true">
+        {showTranslation && slice.translatedText ? (
+          <div className="ai-subtitle-translated" lang={slice.targetLanguage} dir="auto">
+            {slice.translatedText}
           </div>
         ) : null}
         {showOriginal ? (
-          <div className="ai-subtitle-original" lang={cue.sourceLanguage} dir="auto">
-            {cue.originalText}
+          <div className="ai-subtitle-original" lang={slice.sourceLanguage} dir="auto">
+            {slice.originalText}
           </div>
         ) : null}
-        {showTranslation && !cue.translatedText && settings.mode === 'translated' ? (
+        {showTranslation && !slice.translatedText && settings.mode === 'translated' ? (
           <div className="ai-subtitle-unavailable" aria-label="Translation unavailable for this subtitle">
-            {cue.originalText}
+            {slice.originalText}
           </div>
         ) : null}
       </div>

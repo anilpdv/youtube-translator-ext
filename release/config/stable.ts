@@ -4,5 +4,6 @@ export const stableFeatureFlags: FeatureFlags = {
   translatedSrtExport: true, diagnosticsExport: true, transcriptDomFallback: false,
   liveCaptionTranslation: false, adaptiveTiming: false, transcriptPanel: false,
   inPlayerToolbar: false, localOllama: false, chromeBuiltinAI: false,
-  automaticTranslation: false, automaticProviderFallback: false, automaticModelFallback: false,
+  automaticTranslation: false, automaticCachedRendering: false, automaticCaptionLoading: false,
+  automaticProviderFallback: false, automaticModelFallback: false,
 };

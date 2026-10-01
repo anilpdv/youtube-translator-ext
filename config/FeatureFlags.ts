@@ -12,6 +12,8 @@ export interface FeatureFlags {
   readonly localOllama: boolean;
   readonly chromeBuiltinAI: boolean;
   readonly automaticTranslation: boolean;
+  readonly automaticCachedRendering: boolean;
+  readonly automaticCaptionLoading: boolean;
   readonly automaticProviderFallback: boolean;
   readonly automaticModelFallback: boolean;
   readonly betaFeedback?: boolean;

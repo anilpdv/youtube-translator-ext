@@ -25,6 +25,7 @@ import {
 import type { SubtitleRenderingService } from '../rendering/service/SubtitleRenderingService';
 import { RenderingError } from '../rendering/domain/RenderingError';
 import type { PopupStateContext } from '../popup/app/createPopupState';
+import type { TranslationActivationSource } from './SessionState';
 
 export interface ApplicationDependencies {
   readonly captionExtraction?: CaptionExtractionService;
@@ -48,7 +49,7 @@ export class ApplicationController {
     private readonly dependencies: ApplicationDependencies = {},
   ) {
     this.store = new SessionStore(
-      createInitialState({ subtitlesEnabled: settings.autoTranslate }),
+      createInitialState({ subtitlesEnabled: false }),
     );
     this.navigation = new NavigationController({
       onNavigationStart: this.handleNavigationStart,
@@ -66,7 +67,7 @@ export class ApplicationController {
     this.store.update({
       videoId,
       message: videoId
-        ? 'YouTube video detected.'
+        ? 'Video detected. Open the extension to translate subtitles.'
         : 'Open a supported YouTube video.',
     });
   }
@@ -90,9 +91,6 @@ export class ApplicationController {
   ): TranslationSession {
     const session = new TranslationSession(options);
     this.sessions.start(session);
-    this.store.reset(
-      createInitialState({ subtitlesEnabled: this.settings.autoTranslate }),
-    );
     this.store.update({
       sessionId: session.id,
       videoId: session.videoId,
@@ -118,6 +116,7 @@ export class ApplicationController {
     session: TranslationSession,
     captionDocument: CaptionDocument,
   ): Promise<TranslationDocument> {
+    this.assertTranslationRequested();
     this.assertSessionCurrent(session.id);
     const translation = this.dependencies.translation;
     if (!translation) {
@@ -211,6 +210,7 @@ export class ApplicationController {
     session: TranslationSession,
     document: TranslationDocument,
   ): Promise<void> {
+    this.assertTranslationRequested();
     this.assertSessionCurrent(session.id);
     const rendering = this.dependencies.rendering;
     if (!rendering) throw new Error('Rendering is not configured.');
@@ -287,7 +287,7 @@ export class ApplicationController {
       title: 'No supported video',
       message: 'Open a YouTube watch page first.',
     });
-    const session = this.createTranslationSession({
+    const session = new TranslationSession({
       videoId,
       targetLanguage: this.settings.targetLanguage,
       providerId: this.settings.provider,
@@ -297,16 +297,31 @@ export class ApplicationController {
   }
 
   async startTranslationWorkflow(input: {
-    captionTrackId: string;
+    captionTrackId?: string;
     targetLanguage: string;
     providerId: string;
     modelId: string;
+    source: TranslationActivationSource;
   }): Promise<void> {
-    const videoId = this.navigation.getCurrentVideoId();
+    const state = this.store.getSnapshot();
+    const videoId = state.videoId ?? this.navigation.getCurrentVideoId();
     if (!videoId) throw new ApplicationError({
       code: 'VIDEO_NOT_FOUND',
       title: 'No supported video',
       message: 'Open a YouTube watch page first.',
+    });
+    if (state.status === 'loading-captions' || state.status === 'translating' ||
+        state.status === 'preparing-translation') {
+      throw new ApplicationError({
+        code: 'TRANSLATION_ALREADY_RUNNING',
+        title: 'Translation already running',
+        message: 'Cancel the current translation before starting another.',
+        retryable: false,
+      });
+    }
+    this.store.update({
+      activation: { requested: true, source: input.source, requestedAt: Date.now() },
+      error: null,
     });
     const session = this.createTranslationSession({
       videoId,
@@ -314,16 +329,32 @@ export class ApplicationController {
       providerId: input.providerId,
       modelId: input.modelId,
     });
-    const document = await this.loadCaptions(session, {
-      trackId: input.captionTrackId,
+    try {
+      const tracks = state.availableCaptionTracks.length > 0
+        ? state.availableCaptionTracks
+        : await this.discoverCaptionTracks(session);
+      this.assertSessionCurrent(session.id);
+      const selected = input.captionTrackId
+        ? tracks.find((track) => track.id === input.captionTrackId)
+        : tracks.find((track) => track.kind === 'manual') ?? tracks[0];
+      if (!selected) throw new ApplicationError({
+        code: 'CAPTIONS_NOT_FOUND', title: 'Captions unavailable',
+        message: 'No caption track is available for this video.', retryable: false,
+      });
+      const document = await this.loadCaptions(session, {
+      trackId: selected.id,
       languageCode: this.settings.sourceLanguage === 'auto'
         ? undefined
         : this.settings.sourceLanguage,
       preferManual: true,
-    });
-    const translated = await this.translateCaptions(session, document);
-    await this.showTranslatedSubtitles(session, translated);
-    this.completeSession(session.id);
+      });
+      const translated = await this.translateCaptions(session, document);
+      await this.showTranslatedSubtitles(session, translated);
+      this.completeSession(session.id);
+    } catch (error) {
+      if (session.signal.aborted) return;
+      throw error;
+    }
   }
 
   cancelSessionById(sessionId: string): void {
@@ -396,6 +427,7 @@ export class ApplicationController {
     session: TranslationSession,
     selection: TrackSelectionPreferences,
   ): Promise<CaptionDocument> {
+    this.assertTranslationRequested();
     this.assertSessionCurrent(session.id);
     const extraction = this.dependencies.captionExtraction;
     if (!extraction) throw new Error('Caption extraction is not configured.');
@@ -454,14 +486,29 @@ export class ApplicationController {
   };
 
   private readonly handleVideoChanged = (change: NavigationChange): void => {
-    this.store.reset(
-      createInitialState({ subtitlesEnabled: this.settings.autoTranslate }),
-    );
-    this.store.update({
-      videoId: change.videoId,
-      message: change.videoId
-        ? 'New YouTube video detected.'
-        : 'Open a supported YouTube video.',
-    });
+    void this.resetForVideo(change.videoId);
   };
+
+  private assertTranslationRequested(): void {
+    if (!this.store.getSnapshot().activation.requested) {
+      throw new ApplicationError({
+        code: 'USER_ACTION_REQUIRED', title: 'Translation not requested',
+        message: 'Translation can start only after an explicit user action.', retryable: false,
+      });
+    }
+  }
+
+  private async resetForVideo(videoId: string | null): Promise<void> {
+    this.cancelActiveSession('The active YouTube video changed.');
+    await this.dependencies.rendering?.clear();
+    if (videoId) {
+      this.store.resetForVideo({
+        videoId,
+        message: 'Video detected. Open the extension to translate subtitles.',
+      });
+    } else {
+      this.store.reset(createInitialState({}));
+      this.store.update({ message: 'Open a supported YouTube video.' });
+    }
+  }
 }

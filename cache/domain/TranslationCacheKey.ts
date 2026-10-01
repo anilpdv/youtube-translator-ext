@@ -7,6 +7,7 @@ export interface TranslationCacheKey {
   readonly modelId: string;
   readonly promptVersion: string;
   readonly batchingVersion: string;
+  readonly displayPlanningVersion?: string;
   readonly sourceCaptionHash: string;
 }
 
@@ -21,6 +22,7 @@ export function serializeTranslationCacheKey(key: TranslationCacheKey): string {
     key.modelId,
     key.promptVersion,
     key.batchingVersion,
+    key.displayPlanningVersion ?? 'legacy-display-planning',
     key.sourceCaptionHash,
   ].map(encodeURIComponent).join(':');
 }

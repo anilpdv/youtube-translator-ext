@@ -1,8 +1,8 @@
 import type { SubtitleDisplaySettings } from '../domain/SubtitleDisplaySettings';
-import type { SubtitleRenderCue } from '../domain/SubtitleRenderCue';
+import type { SubtitleDisplaySlice } from '../domain/SubtitleDisplaySlice';
 
 export interface OverlayViewModel {
   readonly visible: boolean;
-  readonly cue: SubtitleRenderCue | null;
+  readonly slice: SubtitleDisplaySlice | null;
   readonly settings: SubtitleDisplaySettings;
 }

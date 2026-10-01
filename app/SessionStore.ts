@@ -5,6 +5,7 @@ import {
   type SessionStateUpdate,
   type SessionStatus,
 } from './SessionState';
+import { createInitialState } from './createInitialState';
 
 export type SessionStateListener = (state: Readonly<SessionState>) => void;
 
@@ -63,6 +64,13 @@ export class SessionStore {
 
   reset(nextState: SessionState): void {
     this.state = nextState;
+    this.emit();
+  }
+
+  resetForVideo(
+    patch: Partial<SessionState> & { readonly videoId: string },
+  ): void {
+    this.state = { ...createInitialState({}), ...patch };
     this.emit();
   }
 

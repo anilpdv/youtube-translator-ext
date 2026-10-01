@@ -1,7 +1,7 @@
 import { DisposableStack } from '../../runtime/DisposableStack';
 import type { ActiveSubtitleSnapshot } from '../domain/ActiveSubtitleSnapshot';
 import type { SubtitleDisplaySettings } from '../domain/SubtitleDisplaySettings';
-import type { SubtitleRenderTrack } from '../domain/SubtitleRenderTrack';
+import type { SubtitleDisplayTrack } from '../domain/SubtitleDisplayTrack';
 import type { PlayerAdapter } from '../player/PlayerAdapter';
 import { CueIndex } from './CueIndex';
 
@@ -9,7 +9,7 @@ export type ActiveCueListener = (snapshot: ActiveSubtitleSnapshot) => void;
 
 export class SubtitleScheduler {
   private readonly resources = new DisposableStack();
-  private readonly cueIndex: CueIndex;
+  private readonly sliceIndex: CueIndex;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
   private lastIndex: number | null = null;
@@ -17,11 +17,11 @@ export class SubtitleScheduler {
 
   constructor(
     private readonly player: PlayerAdapter,
-    private readonly track: SubtitleRenderTrack,
+    private readonly track: SubtitleDisplayTrack,
     private settings: SubtitleDisplaySettings,
     private readonly listener: ActiveCueListener,
   ) {
-    this.cueIndex = new CueIndex(track.cues);
+    this.sliceIndex = new CueIndex(track.slices);
   }
 
   start(): void {
@@ -47,7 +47,7 @@ export class SubtitleScheduler {
     if (this.disposed || !this.player.isConnected()) return;
     const playback = this.player.getSnapshot();
     const adjustedTime = Math.max(0, playback.currentTimeMs + this.settings.syncOffsetMs);
-    const index = this.cueIndex.find(adjustedTime);
+    const index = this.sliceIndex.find(adjustedTime);
     const visibleIndex = playback.paused && !this.settings.showDuringPause ? -1 : index;
     const playing = !playback.paused;
     if (force || visibleIndex !== this.lastIndex || playing !== this.lastPlaying) {
@@ -57,8 +57,8 @@ export class SubtitleScheduler {
         videoId: this.track.videoId,
         sessionId: this.track.sessionId,
         playbackTimeMs: adjustedTime,
-        cueIndex: visibleIndex,
-        cue: visibleIndex >= 0 ? this.track.cues[visibleIndex] : null,
+        sliceIndex: visibleIndex,
+        slice: visibleIndex >= 0 ? this.track.slices[visibleIndex] : null,
         playing,
       });
     }
@@ -67,10 +67,10 @@ export class SubtitleScheduler {
 
   private scheduleNextWake(timeMs: number, index: number, playbackRate: number): void {
     if (this.timer !== null) clearTimeout(this.timer);
-    const current = index >= 0 ? this.track.cues[index] : null;
+    const current = index >= 0 ? this.track.slices[index] : null;
     const next = index >= 0
-      ? this.track.cues[index + 1]
-      : this.track.cues.find((cue) => cue.startMs > timeMs);
+      ? this.track.slices[index + 1]
+      : this.track.slices.find((cue) => cue.startMs > timeMs);
     const boundaries = [
       current && current.endMs > timeMs ? current.endMs : null,
       next && next.startMs > timeMs ? next.startMs : null,

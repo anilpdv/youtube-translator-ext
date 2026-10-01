@@ -5,6 +5,14 @@ import type { TranslationBatchResult } from '../translation/domain/TranslationBa
 import type { TranslationDocument } from '../translation/domain/TranslationDocument';
 import type { SubtitleDisplaySettings } from '../rendering/domain/SubtitleDisplaySettings';
 
+export type TranslationActivationSource = 'popup' | 'player-button';
+
+export interface TranslationActivation {
+  readonly requested: boolean;
+  readonly source: TranslationActivationSource | null;
+  readonly requestedAt: number | null;
+}
+
 export type SessionStatus =
   | 'idle'
   | 'discovering-tracks'
@@ -50,6 +58,7 @@ export interface SessionState {
   subtitleDisplay: SubtitleDisplaySettings;
   activeRenderedCueId: string | null;
   renderingActive: boolean;
+  activation: TranslationActivation;
 }
 
 export type SessionStateUpdate = Partial<
@@ -62,7 +71,7 @@ const allowedTransitions: Record<
   SessionStatus,
   ReadonlySet<SessionStatus>
 > = {
-  idle: new Set(['discovering-captions', 'cancelled', 'failed']),
+  idle: new Set(['discovering-tracks', 'loading-captions', 'discovering-captions', 'cancelled', 'failed']),
   'discovering-tracks': new Set(['tracks-ready', 'cancelled', 'failed']),
   'tracks-ready': new Set([
     'loading-captions',

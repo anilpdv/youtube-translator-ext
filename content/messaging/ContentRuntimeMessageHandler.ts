@@ -35,7 +35,7 @@ export class ContentRuntimeMessageHandler {
         await this.application.discoverTracksForCurrentVideo();
         return this.getPopupState();
       case 'application.start-translation':
-        await this.application.startTranslationWorkflow(message);
+        await this.application.startTranslationWorkflow({ ...message, source: 'popup' });
         return this.getPopupState();
       case 'application.cancel-translation':
         this.application.cancelSessionById(message.sessionId);

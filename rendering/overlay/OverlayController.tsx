@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import type { ActiveSubtitleSnapshot } from '../domain/ActiveSubtitleSnapshot';
 import type { SubtitleDisplaySettings } from '../domain/SubtitleDisplaySettings';
-import type { SubtitleRenderTrack } from '../domain/SubtitleRenderTrack';
+import type { SubtitleDisplayTrack } from '../domain/SubtitleDisplayTrack';
 import type { PlayerAdapter } from '../player/PlayerAdapter';
 import { SubtitleScheduler } from '../scheduling/SubtitleScheduler';
 import { OverlayMount } from './OverlayMount';
@@ -20,7 +20,7 @@ export class OverlayController {
 
   constructor(
     player: PlayerAdapter,
-    private readonly track: SubtitleRenderTrack,
+    private readonly track: SubtitleDisplayTrack,
     private settings: SubtitleDisplaySettings,
   ) {
     this.mount = new OverlayMount(player.getOverlayContainer());
@@ -56,8 +56,8 @@ export class OverlayController {
   private render(): void {
     if (this.disposed) return;
     const model: OverlayViewModel = {
-      visible: this.snapshot?.cue != null,
-      cue: this.snapshot?.cue ?? null,
+      visible: this.snapshot?.slice != null,
+      slice: this.snapshot?.slice ?? null,
       settings: this.settings,
     };
     this.root.render(

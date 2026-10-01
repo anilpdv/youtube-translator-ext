@@ -47,7 +47,7 @@ export default defineContentScript({
       sourceTrack: [] as TranscriptSegment[],
       track: [] as TranslatedSegment[],
       activeIndex: -1,
-      subtitlesEnabled: settings.autoTranslate,
+      subtitlesEnabled: false,
       transcriptPanelOpen: false,
       error: undefined as string | undefined,
     };
@@ -815,14 +815,12 @@ export default defineContentScript({
 
         if (seq !== finishSequence) return;
 
-        renderControls();
-        renderOverlay();
-        setupLiveCaptionObserver();
-        setupVideoListeners();
-
-        if (settings.autoTranslate) {
-          startTranslation(newVideoId);
-        }
+        // Navigation only records the video. UI mounting, caption extraction,
+        // live observation and provider work require an explicit command.
+        runtimeState.phase = 'idle';
+        runtimeState.message = 'Video detected. Open the extension to translate subtitles.';
+        runtimeState.subtitlesEnabled = false;
+        broadcastState();
       } catch (err) {
         console.warn('[AI Subtitles] Error in handleNavigateFinish:', err);
       }
@@ -838,12 +836,8 @@ export default defineContentScript({
         try {
           if (changes.yt_ai_settings?.newValue) {
             settings = changes.yt_ai_settings.newValue;
-            runtimeState.subtitlesEnabled = settings.autoTranslate;
-            if (window.location.pathname.startsWith('/watch')) {
-              renderOverlay();
-              renderControls();
-              if (runtimeState.transcriptPanelOpen) renderTranscript();
-            }
+            // Loading settings is deliberately side-effect free. In particular,
+            // the legacy autoTranslate preference is no longer an activation signal.
           }
         } catch (err) {
           console.warn('[AI Subtitles] Error in storage change listener:', err);
@@ -860,6 +854,13 @@ export default defineContentScript({
             const urlParams = new URLSearchParams(window.location.search);
             const videoId = urlParams.get('v');
             if (videoId) {
+              runtimeState.subtitlesEnabled = true;
+              subtitleRenderer.reset();
+              controlsRenderer.reset();
+              transcriptRenderer.reset();
+              renderControls();
+              renderOverlay();
+              setupVideoListeners();
               startTranslation(videoId);
               sendResponse({ status: 'Translation started' });
             } else {

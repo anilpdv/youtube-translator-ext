@@ -37,7 +37,7 @@ export class PopupRuntimeClient {
   }
 
   private async send<T>(message: ApplicationMessage): Promise<T> {
-    const response = await browser.runtime.sendMessage<RuntimeResponse<T>>(message);
+    const response = await browser.runtime.sendMessage(message) as RuntimeResponse<T>;
     if (!response?.ok || response.data === undefined) {
       throw new Error(response?.error?.message ?? 'The extension runtime did not respond.');
     }

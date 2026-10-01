@@ -1,0 +1,22 @@
+{
+  "events": [
+    {
+      "tStartMs": 10000,
+      "dDurationMs": 6000,
+      "segs": [
+        {
+          "utf8": "She ",
+          "tOffsetMs": 0
+        },
+        {
+          "utf8": "goes ",
+          "tOffsetMs": 600
+        },
+        {
+          "utf8": "around",
+          "tOffsetMs": 1100
+        }
+      ]
+    }
+  ]
+}

@@ -1,10 +1,10 @@
-import type { SubtitleRenderCue } from './SubtitleRenderCue';
+import type { SubtitleDisplaySlice } from './SubtitleDisplaySlice';
 
 export interface ActiveSubtitleSnapshot {
   readonly videoId: string;
   readonly sessionId: string;
   readonly playbackTimeMs: number;
-  readonly cueIndex: number;
-  readonly cue: SubtitleRenderCue | null;
+  readonly sliceIndex: number;
+  readonly slice: SubtitleDisplaySlice | null;
   readonly playing: boolean;
 }

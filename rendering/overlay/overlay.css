@@ -1,0 +1,18 @@
+.ai-subtitle-box {
+  max-width: min(88%, 1100px);
+}
+
+.ai-subtitle-translated,
+.ai-subtitle-original {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ai-subtitle-translated {
+  -webkit-line-clamp: 2;
+}
+
+.ai-subtitle-original {
+  -webkit-line-clamp: 2;
+}
