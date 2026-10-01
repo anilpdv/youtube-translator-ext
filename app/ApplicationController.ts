@@ -290,7 +290,7 @@ export class ApplicationController {
     modelId: string;
     source: TranslationActivationSource;
   }): Promise<void> {
-    const state = this.store.getSnapshot();
+    let state = this.store.getSnapshot();
     const videoId = state.videoId ?? this.navigation.getCurrentVideoId();
     if (!videoId) throw new ApplicationError({
       code: 'VIDEO_NOT_FOUND',
@@ -305,6 +305,29 @@ export class ApplicationController {
         message: 'Cancel the current translation before starting another.',
         retryable: false,
       });
+    }
+    // A new explicit click starts a fresh workflow after a failed, partial, or
+    // completed attempt. Keep discovered tracks, but clear the old session
+    // state so the state machine can enter discovery/loading again.
+    if (
+      state.status === 'failed' ||
+      state.status === 'partially-completed' ||
+      state.status === 'completed' ||
+      state.status === 'cancelled'
+    ) {
+      await this.dependencies.rendering?.clear();
+      this.store.transition('idle', {
+        sessionId: null,
+        error: null,
+        translationDocument: null,
+        translatedTrack: [],
+        batchResults: [],
+        subtitlesEnabled: false,
+        renderingActive: false,
+        activeRenderedCueId: null,
+        message: 'Preparing subtitle translation.',
+      });
+      state = this.store.getSnapshot();
     }
     this.store.update({
       activation: { requested: true, source: input.source, requestedAt: Date.now() },

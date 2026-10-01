@@ -98,12 +98,13 @@ const allowedTransitions: Record<
   paused: new Set(['translating', 'cancelled', 'failed']),
   rendering: new Set(['translating', 'completed', 'cancelled', 'failed']),
   'partially-completed': new Set([
+    'idle',
     'translating',
     'completed',
     'cancelled',
     'failed',
   ]),
-  completed: new Set(['discovering-captions', 'cancelled']),
+  completed: new Set(['idle', 'discovering-captions', 'cancelled']),
   cancelled: new Set(['idle', 'discovering-captions']),
   failed: new Set([
     'idle',

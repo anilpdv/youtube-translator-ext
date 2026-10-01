@@ -17,4 +17,10 @@ describe('SessionState transitions', () => {
   it('allows an unchanged status update', () => {
     expect(canTransition('translating', 'translating')).toBe(true);
   });
+
+  it('allows a new explicit workflow after a terminal attempt', () => {
+    expect(canTransition('failed', 'idle')).toBe(true);
+    expect(canTransition('partially-completed', 'idle')).toBe(true);
+    expect(canTransition('completed', 'idle')).toBe(true);
+  });
 });
