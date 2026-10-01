@@ -128,6 +128,9 @@ export class CaptionFetcher {
       });
     }
     if (!track.formatHint) url.searchParams.set('fmt', 'json3');
+    // Source extraction must never request YouTube auto-translation. The
+    // legacy working helper removed tlang whenever it fetched the source URL.
+    url.searchParams.delete('tlang');
     return url;
   }
 

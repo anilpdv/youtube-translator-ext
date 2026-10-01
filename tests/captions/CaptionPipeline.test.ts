@@ -40,6 +40,36 @@ describe('caption extraction foundations', () => {
       .toBe('manual');
   });
 
+  it('keeps the first discovered track as the default source track', async () => {
+    const discovery = new CaptionTrackDiscovery({
+      read: async () => ({
+        captions: {
+          playerCaptionsTracklistRenderer: {
+            captionTracks: [
+              {
+                baseUrl: 'https://www.youtube.com/api/timedtext?v=automatic',
+                languageCode: 'hi',
+                name: { simpleText: 'Hindi (auto-generated)' },
+                vssId: 'hi',
+                kind: 'asr',
+                isTranslatable: true,
+              },
+              {
+                baseUrl: 'https://www.youtube.com/api/timedtext?v=manual',
+                languageCode: 'hi',
+                name: { simpleText: 'Hindi' },
+                vssId: 'hi-manual',
+                isTranslatable: true,
+              },
+            ],
+          },
+        },
+      }),
+    });
+    const tracks = await discovery.discover();
+    expect(tracks.find((track) => track.isDefault)?.id).toBe('hi');
+  });
+
   it('parses JSON3 and normalizes entities and missing duration', () => {
     const raw = new Json3CaptionParser().parse(
       JSON.stringify({

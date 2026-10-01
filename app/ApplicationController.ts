@@ -347,7 +347,10 @@ export class ApplicationController {
       this.assertSessionCurrent(session.id);
       const selected = input.captionTrackId
         ? tracks.find((track) => track.id === input.captionTrackId)
-        : tracks.find((track) => track.kind === 'manual') ?? tracks[0];
+        // Preserve YouTube's captionTracks order. The legacy working path used
+        // captionTracks[0] as its base source track; silently preferring a
+        // manual track can select a different signed URL that returns empty.
+        : tracks.find((track) => track.isDefault) ?? tracks[0];
       if (!selected) throw new ApplicationError({
         code: 'CAPTIONS_NOT_FOUND', title: 'Captions unavailable',
         message: 'No caption track is available for this video.', retryable: false,
