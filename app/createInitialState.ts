@@ -15,9 +15,7 @@ export function createInitialState(
     message: '',
     sourceTrack: [],
     translatedTrack: [],
-    activeCueIndex: -1,
     subtitlesEnabled: options.subtitlesEnabled ?? false,
-    transcriptPanelOpen: false,
     progress: {
       completedBatches: 0,
       failedBatches: 0,

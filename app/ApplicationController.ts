@@ -1,4 +1,4 @@
-import type { ExtensionSettings } from '../utils/types';
+import type { ExtensionSettings } from '../settings/ExtensionSettings';
 import { ApplicationError } from './ApplicationError';
 import { DisposableStack } from '../runtime/DisposableStack';
 import { SessionGuard } from '../runtime/SessionGuard';
@@ -98,7 +98,6 @@ export class ApplicationController {
       message: 'Preparing subtitle translation.',
       sourceTrack: [],
       translatedTrack: [],
-      activeCueIndex: -1,
       progress: {
         completedBatches: 0,
         failedBatches: 0,
@@ -174,15 +173,7 @@ export class ApplicationController {
         {
           translationDocument: result,
           batchResults: result.batchResults,
-          translatedTrack: result.cues.map((cue) => ({
-            id: cue.id,
-            start: cue.startMs / 1000,
-            dur: (cue.endMs - cue.startMs) / 1000,
-            text: cue.sourceText,
-            translatedText: cue.translatedText,
-            source: 'timedtext',
-            translationStatus: 'translated',
-          })),
+          translatedTrack: result.cues,
           progress: {
             completedCues: result.translatedCueCount,
             failedCues: result.failedCueCount,
@@ -450,13 +441,7 @@ export class ApplicationController {
       this.assertSessionCurrent(session.id);
       this.store.transition('captions-ready', {
         message: `${document.cues.length} caption cues loaded.`,
-        sourceTrack: document.cues.map((cue) => ({
-          id: cue.id,
-          start: cue.startMs / 1000,
-          dur: (cue.endMs - cue.startMs) / 1000,
-          text: cue.text,
-          source: 'timedtext',
-        })),
+        sourceTrack: document.cues,
         progress: { totalCues: document.cues.length },
         selectedCaptionTrackId: document.track.id,
       });

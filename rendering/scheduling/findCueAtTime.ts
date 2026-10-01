@@ -1,7 +1,7 @@
-import type { SubtitleRenderCue } from '../domain/SubtitleRenderCue';
+import type { SubtitleDisplaySlice } from '../domain/SubtitleDisplaySlice';
 
 export function findCueAtTime(
-  cues: readonly SubtitleRenderCue[],
+  cues: readonly SubtitleDisplaySlice[],
   timeMs: number,
 ): number {
   let low = 0;

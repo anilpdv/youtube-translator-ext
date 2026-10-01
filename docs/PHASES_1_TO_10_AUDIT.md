@@ -83,7 +83,7 @@ This document records the verification, qualification status, and authoritative 
   - Strict absence of unconfirmed silent fallback chains (e.g. no silent fallback between providers or unselected models).
 - **Evidence**:
   - Files: `translation/batching/`, `translation/execution/`, `translation/prompts/`, `translation/providers/GeminiProvider.ts`, `translation/validation/`
-  - Tests: `tests/contracts/translation/FakeTranslationProvider.contract.test.ts`, `tests/translation/TranslationResponseValidator.test.ts`, `tests/unit/translationEngine.test.ts`
+  - Tests: `tests/contracts/translation/FakeTranslationProvider.contract.test.ts`, `tests/translation/TranslationResponseValidator.test.ts`, `tests/translation/detectAbnormalRepetition.test.ts`
 - **Internal Beta Blocker**: No
 - **Public Beta Blocker**: No
 - **Stable Release Blocker**: No
@@ -97,7 +97,7 @@ This document records the verification, qualification status, and authoritative 
   - Rendering invariants enforced: single active overlay, single scheduler, and idempotent double-disposal.
 - **Evidence**:
   - Files: `rendering/player/`, `rendering/scheduling/`, `rendering/service/SubtitleRenderingService.ts`
-  - Tests: `tests/rendering/findCueAtTime.test.ts`, `tests/rendering/createSubtitleRenderTrack.test.ts`, `tests/component/SubtitleOverlay.test.tsx`
+  - Tests: `tests/rendering/findCueAtTime.test.ts`, `tests/rendering/createSubtitleRenderTrack.test.ts`, `tests/rendering/SubtitlePhraseCardPlanner.test.ts`
 - **Internal Beta Blocker**: No
 - **Public Beta Blocker**: No
 - **Stable Release Blocker**: No
@@ -254,14 +254,14 @@ This document records the verification, qualification status, and authoritative 
 
 ---
 
-## Legacy Removal Plan
+## Legacy Removal
 
-- **Deprecated Wrappers**:
-  - `utils/translationEngine.ts`: Maintained as temporary compatibility wrapper; legacy fallback calls isolated.
-  - `utils/transcript.ts`: Maintained for legacy parsing utility migration; deprecated DOM scrapers gated behind experimental flags.
-  - `utils/subtitleRuntime.ts`: Isolated compatibility layer.
-- **Retirement Milestone**: Target removal milestone is `v1.1.0`.
-- **Policy**: No new domain features may import or depend on legacy `utils/*` wrappers.
+- The legacy translation engine, transcript/runtime wrappers, YouTube service,
+  safe root renderer, and legacy React subtitle components have been removed.
+- Settings now live under `settings/`; caption normalization, language mapping,
+  timed-text parsing/fetching, and SRT export live in their domain modules.
+- The production content, popup, and background entry points have no imports
+  from the removed runtime.
 
 ---
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { findCueAtTime } from '../../rendering/scheduling/findCueAtTime';
-import type { SubtitleRenderCue } from '../../rendering/domain/SubtitleRenderCue';
+import type { SubtitleDisplaySlice } from '../../rendering/domain/SubtitleDisplaySlice';
 
-const cue = (id: string, startMs: number, endMs: number): SubtitleRenderCue => ({
+const cue = (id: string, startMs: number, endMs: number): SubtitleDisplaySlice => ({
   id,
   startMs,
   endMs,
@@ -10,6 +10,10 @@ const cue = (id: string, startMs: number, endMs: number): SubtitleRenderCue => (
   translatedText: id,
   sourceLanguage: 'en',
   targetLanguage: 'fr',
+  parentCueId: id,
+  sliceIndex: 0,
+  timingSource: 'estimated',
+  cumulativeWindow: false,
 });
 
 describe('findCueAtTime', () => {

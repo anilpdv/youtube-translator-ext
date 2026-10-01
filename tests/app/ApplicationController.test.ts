@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApplicationController } from '../../app/ApplicationController';
-import { DEFAULT_SETTINGS } from '../../utils/types';
+import { DEFAULT_SETTINGS } from '../../settings/DefaultSettings';
 
 describe('ApplicationController session ownership', () => {
   it('does not allow a cancelled session to commit results', () => {
@@ -22,10 +22,11 @@ describe('ApplicationController session ownership', () => {
       application.store.update({
         translatedTrack: [
           {
-            start: 0,
-            dur: 1,
-            text: 'Old translation',
+            id: 'old',
+            sourceText: 'Old translation',
             translatedText: 'Old translation',
+            startMs: 0,
+            endMs: 1_000,
           },
         ],
       });

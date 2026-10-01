@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import React from 'react';
-import * as storageModule from '../../utils/storage';
-import { DEFAULT_SETTINGS, ExtensionSettings } from '../../utils/types';
+import * as storageModule from '../../settings/BrowserSettingsRepository';
+import { DEFAULT_SETTINGS } from '../../settings/DefaultSettings';
+import type { ExtensionSettings } from '../../settings/ExtensionSettings';
 
-vi.mock('../../utils/storage', () => ({
+vi.mock('../../settings/BrowserSettingsRepository', () => ({
   getSettings: vi.fn(),
   saveSettings: vi.fn(),
 }));

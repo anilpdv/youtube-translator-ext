@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApplicationController } from '../../app/ApplicationController';
-import { DEFAULT_SETTINGS } from '../../utils/types';
+import { DEFAULT_SETTINGS } from '../../settings/DefaultSettings';
 
 describe('manual activation', () => {
   it('starts idle without touching caption, translation, or rendering services', () => {

@@ -20,8 +20,8 @@ import { TranslationCoordinator } from '../translation/execution/TranslationCoor
 import { RetryPolicy } from '../translation/execution/RetryPolicy';
 import { TRANSLATION_PROMPT_VERSION } from '../translation/prompts/TranslationPromptVersion';
 import { SubtitleRenderingService } from '../rendering/service/SubtitleRenderingService';
-import { getSettings } from '../utils/storage';
-import type { ExtensionSettings } from '../utils/types';
+import { getSettings } from '../settings/BrowserSettingsRepository';
+import type { ExtensionSettings } from '../settings/ExtensionSettings';
 
 export async function createContentApplication(): Promise<ApplicationController> {
   const storedSettings: ExtensionSettings = await getSettings();
@@ -30,10 +30,6 @@ export async function createContentApplication(): Promise<ApplicationController>
   const settings: ExtensionSettings = {
     ...storedSettings,
     apiKey: '',
-    openrouterKey: '',
-    ollamaEndpoint: '',
-    ollamaModel: '',
-    openrouterModel: '',
   };
   const discovery = new CaptionTrackDiscovery(new PagePlayerDataReader());
   const captionExtraction = new CaptionExtractionService(

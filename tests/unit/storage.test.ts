@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getSettings, saveSettings } from '../../utils/storage';
-import { DEFAULT_SETTINGS } from '../../utils/types';
+import { getSettings, saveSettings } from '../../settings/BrowserSettingsRepository';
+import { DEFAULT_SETTINGS } from '../../settings/DefaultSettings';
 
 describe('storage', () => {
   describe('getSettings', () => {
@@ -28,7 +28,6 @@ describe('storage', () => {
       (chrome.storage.local.get as any).mockImplementation((_keys: string[], cb: (r: any) => void) => cb({}));
       const settings = await getSettings();
       expect(settings.apiKey).toBe('');
-      expect(settings.openrouterKey).toBe('');
     });
   });
 

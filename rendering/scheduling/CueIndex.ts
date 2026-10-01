@@ -1,11 +1,11 @@
-import type { SubtitleRenderCue } from '../domain/SubtitleRenderCue';
+import type { SubtitleDisplaySlice } from '../domain/SubtitleDisplaySlice';
 import { findCueAtTime } from './findCueAtTime';
 
 export class CueIndex {
   private activeIndex = -1;
   private lastTimeMs = -1;
 
-  constructor(private readonly cues: readonly SubtitleRenderCue[]) {}
+  constructor(private readonly cues: readonly SubtitleDisplaySlice[]) {}
 
   find(timeMs: number): number {
     const movedFar = this.lastTimeMs >= 0 && timeMs - this.lastTimeMs > 5_000;

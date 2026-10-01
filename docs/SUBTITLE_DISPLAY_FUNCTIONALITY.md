@@ -120,11 +120,11 @@ card immediately; it does not replay earlier words.
 YouTube player. The overlay receives one complete card and does not mutate it
 while its interval is active.
 
-The overlay and `components/SubtitleOverlay.tsx` compatibility path use
-non-destructive wrapping: `pre-wrap`, visible overflow, and normal word
-boundaries. No line clamp, hidden overflow, `nowrap`, or array slicing is used
-to delete text. The planner is responsible for producing cards that fit two
-lines; validation catches a planner failure instead of hiding the extra text.
+The overlay uses non-destructive wrapping: `pre-wrap`, visible overflow, and
+normal word boundaries. No line clamp, hidden overflow, `nowrap`, or array
+slicing is used to delete text. The planner is responsible for producing cards
+that fit two lines; validation catches a planner failure instead of hiding the
+extra text.
 
 ## Relevant files
 
@@ -148,6 +148,9 @@ lines; validation catches a planner failure instead of hiding the extra text.
 - `entrypoints/popup/App.tsx`
 - `popup/app/PopupController.ts`
 - `popup/runtime/PopupRuntimeClient.ts`
+- `settings/ExtensionSettings.ts`
+- `settings/DefaultSettings.ts`
+- `settings/BrowserSettingsRepository.ts`
 
 ### Planning and validation
 
@@ -162,6 +165,5 @@ lines; validation catches a planner failure instead of hiding the extra text.
 - `captions/domain/CaptionTimingUnit.ts`
 - `translation/validation/TranslationResponseValidator.ts`
 
-Legacy files may remain temporarily for compatibility tests, but they are not
-imported by the active content, popup, or background runtime. The active path
-has one planner, one scheduler, one overlay, and one provider route.
+The active path has one planner, one scheduler, one overlay, and one provider
+route. Legacy runtime files and legacy-only tests have been removed.

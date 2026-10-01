@@ -1,8 +1,9 @@
 import type { ApplicationError } from './ApplicationError';
-import type { TranscriptSegment, TranslatedSegment } from '../utils/types';
+import type { CaptionCue } from '../captions/domain/CaptionCue';
 import type { CaptionTrack } from '../captions/domain/CaptionTrack';
 import type { TranslationBatchResult } from '../translation/domain/TranslationBatch';
 import type { TranslationDocument } from '../translation/domain/TranslationDocument';
+import type { TranslatedCue } from '../translation/domain/TranslationCue';
 import type { SubtitleDisplaySettings } from '../rendering/domain/SubtitleDisplaySettings';
 
 export type TranslationActivationSource = 'popup' | 'player-button';
@@ -44,11 +45,9 @@ export interface SessionState {
   sessionId: string | null;
   videoId: string | null;
   message: string;
-  sourceTrack: TranscriptSegment[];
-  translatedTrack: TranslatedSegment[];
-  activeCueIndex: number;
+  sourceTrack: readonly CaptionCue[];
+  translatedTrack: readonly TranslatedCue[];
   subtitlesEnabled: boolean;
-  transcriptPanelOpen: boolean;
   progress: SessionProgress;
   error: ApplicationError | null;
   availableCaptionTracks: readonly CaptionTrack[];

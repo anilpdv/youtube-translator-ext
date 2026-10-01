@@ -9,8 +9,9 @@ import {
   TestTube2,
   Sliders,
 } from 'lucide-react';
-import { getSettings, saveSettings } from '../../utils/storage';
-import { DEFAULT_SETTINGS, type ExtensionSettings } from '../../utils/types';
+import { getSettings, saveSettings } from '../../settings/BrowserSettingsRepository';
+import { DEFAULT_SETTINGS } from '../../settings/DefaultSettings';
+import type { ExtensionSettings } from '../../settings/ExtensionSettings';
 import { PopupController } from '../../popup/app/PopupController';
 import { PopupRuntimeClient } from '../../popup/messaging/PopupRuntimeClient';
 import type { PopupState as DomainPopupState } from '../../popup/app/PopupState';
@@ -615,52 +616,6 @@ export const App: React.FC = () => {
                     placeholder="AIzaSy..."
                     value={settings.apiKey}
                     onChange={(e) => handleSettingChange('apiKey', e.target.value)}
-                  />
-                </label>
-              </>
-            )}
-
-            {settings.provider === 'ollama' && (
-              <>
-                <label>
-                  Ollama Endpoint
-                  <input
-                    type="text"
-                    placeholder="http://localhost:11434"
-                    value={settings.ollamaEndpoint}
-                    onChange={(e) => handleSettingChange('ollamaEndpoint', e.target.value)}
-                  />
-                </label>
-                <label>
-                  Ollama Model
-                  <input
-                    type="text"
-                    placeholder="qwen2.5:0.5b"
-                    value={settings.ollamaModel}
-                    onChange={(e) => handleSettingChange('ollamaModel', e.target.value)}
-                  />
-                </label>
-              </>
-            )}
-
-            {settings.provider === 'openrouter' && (
-              <>
-                <label>
-                  OpenRouter API Key
-                  <input
-                    type="password"
-                    placeholder="sk-or-v1-..."
-                    value={settings.openrouterKey}
-                    onChange={(e) => handleSettingChange('openrouterKey', e.target.value)}
-                  />
-                </label>
-                <label>
-                  Model ID
-                  <input
-                    type="text"
-                    placeholder="openai/gpt-4o-mini"
-                    value={settings.openrouterModel}
-                    onChange={(e) => handleSettingChange('openrouterModel', e.target.value)}
                   />
                 </label>
               </>
