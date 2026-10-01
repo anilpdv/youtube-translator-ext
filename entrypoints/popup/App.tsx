@@ -209,8 +209,10 @@ export const App: React.FC = () => {
     setStatusMessage('Preparing subtitles…');
     const current = domainState;
     if (!current) return;
+    const captionTrackId =
+      current.selectedCaptionTrackId || current.captionTracks[0]?.id;
     void controllerRef.current?.startTranslation({
-      captionTrackId: current.selectedCaptionTrackId || current.captionTracks[0]?.id || '',
+      ...(captionTrackId ? { captionTrackId } : {}),
       targetLanguage: settings.targetLanguage,
       providerId: 'gemini',
       modelId,

@@ -15,7 +15,8 @@ export function validateApplicationMessage(value: unknown): value is Application
     case 'application.cancel-translation':
       return nonEmpty(record.sessionId);
     case 'application.start-translation':
-      return nonEmpty(record.captionTrackId) && nonEmpty(record.targetLanguage) &&
+      return (record.captionTrackId === undefined || nonEmpty(record.captionTrackId)) &&
+        nonEmpty(record.targetLanguage) &&
         nonEmpty(record.providerId) && nonEmpty(record.modelId);
     case 'application.retry-failed-batches':
       return nonEmpty(record.sessionId) && Array.isArray(record.batchIds) &&

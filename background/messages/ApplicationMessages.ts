@@ -4,7 +4,8 @@ export interface GetApplicationStateMessage { readonly type: 'application.get-st
 export interface DiscoverCaptionTracksMessage { readonly type: 'application.discover-tracks'; }
 export interface StartTranslationMessage {
   readonly type: 'application.start-translation';
-  readonly captionTrackId: string;
+  /** Optional: the application selects the best available track when omitted. */
+  readonly captionTrackId?: string;
   readonly targetLanguage: string;
   readonly providerId: string;
   readonly modelId: string;
