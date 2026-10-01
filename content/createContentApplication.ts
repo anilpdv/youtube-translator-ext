@@ -6,7 +6,6 @@ import { DEFAULT_CAPTION_LIMITS } from '../captions/domain/CaptionLimits';
 import { CaptionParserRegistry } from '../captions/parsing/CaptionParserRegistry';
 import { Json3CaptionParser } from '../captions/parsing/Json3CaptionParser';
 import { WebVttCaptionParser } from '../captions/parsing/WebVttCaptionParser';
-import { Srv3CaptionParser } from '../captions/parsing/Srv3CaptionParser';
 import { BrowserCaptionTextDecoder } from '../captions/normalization/decodeCaptionText';
 import { CaptionNormalizer } from '../captions/normalization/CaptionNormalizer';
 import { CaptionValidator } from '../captions/validation/CaptionValidator';
@@ -36,11 +35,7 @@ export async function createContentApplication(): Promise<ApplicationController>
   const captionExtraction = new CaptionExtractionService(
     discovery,
     new CaptionFetcher({ timeoutMs: 30_000, limits: DEFAULT_CAPTION_LIMITS }),
-    new CaptionParserRegistry([
-      new Json3CaptionParser(),
-      new WebVttCaptionParser(),
-      new Srv3CaptionParser(),
-    ]),
+    new CaptionParserRegistry([new Json3CaptionParser(), new WebVttCaptionParser()]),
     new CaptionNormalizer(new BrowserCaptionTextDecoder(), {
       limits: DEFAULT_CAPTION_LIMITS,
       defaultDurationMs: 3_000,
