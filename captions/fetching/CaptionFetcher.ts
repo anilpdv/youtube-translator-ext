@@ -9,6 +9,18 @@ export interface CaptionFetcherOptions {
   readonly limits: CaptionLimits;
 }
 
+interface CaptionProbeResult {
+  readonly label: string;
+  readonly status: number;
+  readonly ok: boolean;
+  readonly redirected: boolean;
+  readonly contentType: string | null;
+  readonly bodyBytes: number;
+  readonly url: Record<string, unknown>;
+}
+
+let captionProbeCompleted = false;
+
 export class CaptionFetcher {
   constructor(private readonly options: CaptionFetcherOptions) {}
 
@@ -30,6 +42,19 @@ export class CaptionFetcher {
     );
     const combinedSignal = this.combineSignals(signal, timeoutController.signal);
     try {
+      const probeEnabled =
+        (import.meta.env as ImportMetaEnv & { DEV?: boolean }).DEV === true ||
+        (typeof localStorage !== 'undefined' &&
+          localStorage.getItem('ai_subtitles_caption_probe') === '1');
+      if (
+        probeEnabled &&
+        typeof location !== 'undefined' &&
+        /(^|\.)youtube\.com$/i.test(location.hostname) &&
+        !captionProbeCompleted
+      ) {
+        captionProbeCompleted = true;
+        await runCaptionProbe(track, combinedSignal);
+      }
       const response = await fetch(url, {
         method: 'GET',
         credentials: 'include',
@@ -187,6 +212,72 @@ export class CaptionFetcher {
     }
     return controller.signal;
   }
+}
+
+async function runCaptionProbe(
+  track: CaptionTrack,
+  signal: AbortSignal,
+): Promise<void> {
+  const candidates = [
+    { label: 'untouched-base-url', url: new URL(track.baseUrl) },
+    { label: 'current-caption-fetcher', url: createCurrentProbeUrl(track) },
+    { label: 'legacy-json3', url: createLegacyJson3ProbeUrl(track) },
+    { label: 'json3-without-tlang', url: createJson3WithoutTargetProbeUrl(track) },
+  ];
+  const results: CaptionProbeResult[] = [];
+  for (const candidate of candidates) {
+    try {
+      results.push(await probeCaptionUrl(candidate.label, candidate.url, signal));
+    } catch (error) {
+      console.warn('[AI Subtitles][CaptionProbe] failed', {
+        label: candidate.label,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  console.warn('[AI Subtitles][CaptionProbe] comparison', results);
+}
+
+async function probeCaptionUrl(
+  label: string,
+  url: URL,
+  signal: AbortSignal,
+): Promise<CaptionProbeResult> {
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+    signal,
+  });
+  const body = await response.text();
+  return {
+    label,
+    status: response.status,
+    ok: response.ok,
+    redirected: response.redirected,
+    contentType: response.headers.get('content-type'),
+    bodyBytes: new TextEncoder().encode(body).byteLength,
+    url: describeCaptionUrl(url),
+  };
+}
+
+function createCurrentProbeUrl(track: CaptionTrack): URL {
+  const url = new URL(track.baseUrl);
+  if (!track.formatHint) url.searchParams.set('fmt', 'json3');
+  url.searchParams.delete('tlang');
+  return url;
+}
+
+function createLegacyJson3ProbeUrl(track: CaptionTrack): URL {
+  const url = new URL(track.baseUrl);
+  url.searchParams.set('fmt', 'json3');
+  return url;
+}
+
+function createJson3WithoutTargetProbeUrl(track: CaptionTrack): URL {
+  const url = new URL(track.baseUrl);
+  url.searchParams.set('fmt', 'json3');
+  url.searchParams.delete('tlang');
+  return url;
 }
 
 function describeCaptionUrl(input: URL | string): Record<string, unknown> {
