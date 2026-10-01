@@ -68,10 +68,11 @@ export class TranslationCoordinator {
     const batchResults = slots.filter(
       (result): result is TranslationBatchResult => result !== undefined,
     );
-    const cues = request.captionDocument.cues
+    const sourceCues = batches.flatMap((batch) => batch.cues);
+    const cues = sourceCues
       .map((cue) => translatedById.get(cue.id))
       .filter((cue): cue is TranslatedCue => cue !== undefined);
-    const failedCueCount = request.captionDocument.cues.length - cues.length;
+    const failedCueCount = sourceCues.length - cues.length;
     return {
       sessionId: request.sessionId,
       videoId: request.videoId,
@@ -219,7 +220,7 @@ export class TranslationCoordinator {
         (count, result) => count + batches[result!.batchIndex].cues.length,
         0,
       ),
-      totalCues: request.captionDocument.cues.length,
+      totalCues: batches.reduce((count, batch) => count + batch.cues.length, 0),
       activeBatchIds: [],
     });
   }
