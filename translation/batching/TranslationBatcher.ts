@@ -5,7 +5,7 @@ import type { TranslationLimits } from '../domain/TranslationLimits';
 import type { SourceTranslationCue } from '../domain/TranslationCue';
 import { TranslationError as TranslationErrorClass } from '../domain/TranslationError';
 import { estimateTokens } from './estimateCueCost';
-import { createTranslationTimingSlices } from '../adapters/createTranslationTimingSlices';
+import { createTranslationPhraseCards } from '../adapters/createTranslationPhraseCards';
 
 export class TranslationBatcher {
   constructor(private readonly limits: TranslationLimits) {}
@@ -35,7 +35,7 @@ export class TranslationBatcher {
       characterCount = 0;
       estimatedCost = 0;
     };
-    for (const source of createTranslationTimingSlices(document)) {
+    for (const source of createTranslationPhraseCards(document)) {
       const chars = source.text.length;
       const cost = estimateTokens(source.text);
       if (

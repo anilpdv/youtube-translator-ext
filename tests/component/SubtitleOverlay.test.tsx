@@ -124,14 +124,14 @@ describe('SubtitleOverlay', () => {
     expect(captionPanel.style.background).toContain('rgba(0, 0, 0, 0.5)');
   });
 
-  it('renders caption rows without allowing browser-created extra lines', () => {
+  it('uses non-destructive wrapping for the complete card text', () => {
     renderAtCueEnd();
     const textEl = screen.getByText('Hello everyone');
-    expect(textEl.style.whiteSpace).toBe('nowrap');
-    expect(textEl.style.overflow).toBe('hidden');
+    expect(textEl.style.whiteSpace).toBe('pre-wrap');
+    expect(textEl.style.overflow).toBe('visible');
   });
 
-  it('keeps long monolingual captions to two rendered rows', () => {
+  it('preserves long monolingual captions instead of deleting extra rows', () => {
     const longSegment: TranslatedSegment = {
       start: 0,
       dur: 6,
@@ -147,8 +147,8 @@ describe('SubtitleOverlay', () => {
     });
 
     const lines = screen.getAllByTestId('subtitle-caption-line');
-    expect(lines).toHaveLength(2);
-    lines.forEach((line) => expect(line.style.whiteSpace).toBe('nowrap'));
+    expect(lines.length).toBeGreaterThan(2);
+    lines.forEach((line) => expect(line.style.whiteSpace).toBe('pre-wrap'));
   });
 
   it('uses a stable full-width caption panel instead of resizing each text row', () => {

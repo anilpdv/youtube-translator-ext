@@ -2,17 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import * as storageModule from '../../utils/storage';
-import * as engineModule from '../../utils/translationEngine';
 import { DEFAULT_SETTINGS, ExtensionSettings } from '../../utils/types';
 
 vi.mock('../../utils/storage', () => ({
   getSettings: vi.fn(),
   saveSettings: vi.fn(),
-}));
-
-vi.mock('../../utils/translationEngine', () => ({
-  isBuiltinAIAvailable: vi.fn(),
-  translateBatch: vi.fn(),
 }));
 
 import { App, ColorSetting } from '../../entrypoints/popup/App';
@@ -24,8 +18,6 @@ beforeEach(() => {
   vi.mocked(storageModule.saveSettings).mockImplementation((s) =>
     Promise.resolve({ ...DEFAULT, ...s } as any)
   );
-  vi.mocked(engineModule.isBuiltinAIAvailable).mockReturnValue(true);
-  vi.mocked(engineModule.translateBatch).mockResolvedValue([]);
 });
 
 describe('App (Popup)', () => {
@@ -35,15 +27,14 @@ describe('App (Popup)', () => {
     expect(screen.getByText('Real-time subtitles for YouTube')).toBeInTheDocument();
   });
 
-  it('shows Built-in AI ready badge when available', async () => {
+  it('shows the stable Gemini provider badge', async () => {
     render(<App />);
-    expect(await screen.findByText(/Chrome Built-in AI is ready/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Gemini translation is ready/i)).toBeInTheDocument();
   });
 
-  it('shows amber notice when Built-in AI is NOT available', async () => {
-    vi.mocked(engineModule.isBuiltinAIAvailable).mockReturnValueOnce(false);
+  it('does not expose automatic translation as a startup action', async () => {
     render(<App />);
-    expect(await screen.findByText(/Built-in AI is unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Translation starts only after you click Generate subtitles/i)).toBeInTheDocument();
   });
 
   it('renders language selectors and updates settings', async () => {
@@ -95,7 +86,7 @@ describe('App (Popup)', () => {
     const providerSelect = await screen.findByLabelText('Engine Provider');
     expect(providerSelect).toBeInTheDocument();
     expect(screen.getByText(/Google Gemini API/i)).toBeInTheDocument();
-    expect(screen.getByText(/Local Ollama/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Local Ollama/i)).not.toBeInTheDocument();
   });
 
   it('shows Gemini key input when Gemini provider is active', async () => {
@@ -107,25 +98,16 @@ describe('App (Popup)', () => {
     expect(await screen.findByPlaceholderText('AIzaSy...')).toBeInTheDocument();
   });
 
-  it('shows Ollama inputs when Ollama provider is active', async () => {
-    vi.mocked(storageModule.getSettings).mockResolvedValueOnce({
-      ...DEFAULT,
-      provider: 'ollama',
-      ollamaEndpoint: 'http://localhost:11434',
-      ollamaModel: 'gemma2:2b',
-    });
+  it('normalizes legacy provider settings to Gemini', async () => {
+    vi.mocked(storageModule.getSettings).mockResolvedValueOnce({ ...DEFAULT, provider: 'gemini' });
     render(<App />);
     const engineBtn = await screen.findByRole('button', { name: /translation engine/i });
     fireEvent.click(engineBtn);
 
-    expect(await screen.findByDisplayValue('http://localhost:11434')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('gemma2:2b')).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText('AIzaSy...')).toBeInTheDocument();
   });
 
   it('tests translation engine and shows success message', async () => {
-    vi.mocked(engineModule.translateBatch).mockResolvedValueOnce([
-      { start: 0, dur: 2, text: 'Hello, world!', translatedText: 'Bonjour le monde!' },
-    ]);
     render(<App />);
     const engineBtn = await screen.findByRole('button', { name: /translation engine/i });
     fireEvent.click(engineBtn);
@@ -133,7 +115,7 @@ describe('App (Popup)', () => {
     const testBtn = await screen.findByRole('button', { name: /test translation engine/i });
     fireEvent.click(testBtn);
 
-    expect(await screen.findByText(/Engine ready: "Bonjour le monde!"/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Select Gemini and start translation/i)).toBeInTheDocument();
   });
 
   it('shows subtitle appearance drawer with flat controls and preview', async () => {
@@ -171,18 +153,9 @@ describe('App (Popup)', () => {
     );
   });
 
-  it('shows status message from POPUP_STATUS_UPDATE', async () => {
-    let listener: (msg: any) => void = () => {};
-    vi.mocked(chrome.runtime.onMessage.addListener).mockImplementation((fn: any) => {
-      listener = fn;
-    });
+  it('shows the domain runtime availability message', async () => {
     render(<App />);
-    await screen.findByText('AI Subtitle Translator');
-
-    await act(async () => {
-      listener({ type: 'POPUP_STATUS_UPDATE', message: '⏳ Extracting…', isReady: false });
-    });
-    expect(await screen.findByText('⏳ Extracting…')).toBeInTheDocument();
+    expect(await screen.findByText('Open a YouTube video to begin.')).toBeInTheDocument();
   });
 });
 

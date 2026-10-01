@@ -56,6 +56,12 @@ export class PopupController {
     this.setState(await this.runtime.startTranslation(input));
     await this.refresh();
   }
+  async setSubtitlesEnabled(enabled: boolean): Promise<void> {
+    this.setState(await this.runtime.setSubtitlesEnabled(enabled));
+  }
+  async updateSubtitleSettings(settings: Parameters<PopupRuntimeClient['updateSubtitleSettings']>[0]): Promise<void> {
+    this.setState(await this.runtime.updateSubtitleSettings(settings));
+  }
   async cancelTranslation(): Promise<void> {
     if (this.state?.sessionId) this.setState(await this.runtime.cancelTranslation(this.state.sessionId));
   }

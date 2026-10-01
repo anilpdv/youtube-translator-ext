@@ -24,22 +24,13 @@ const mergeCards = (
     options.maximumCharactersPerLine,
     options.maximumLines,
   );
-  const translatedText =
-    first.translatedText || second.translatedText
-      ? wrapCaptionText(
-          joinCaptionUnitText([first.translatedText ?? '', second.translatedText ?? '']),
-          options.maximumCharactersPerLine,
-          options.maximumLines,
-        )
-      : null;
-
   return {
     ...first,
     id: `${first.id}+${second.id}`,
     parentCueIds: [...new Set([...first.parentCueIds, ...second.parentCueIds])],
     endMs: second.endMs,
     originalText,
-    translatedText,
+    translatedText: null,
     boundaryReason: second.boundaryReason,
   };
 };
@@ -92,9 +83,7 @@ const tryRebalanceWithPrevious = (
             options.maximumCharactersPerLine,
             options.maximumLines,
           ),
-          translatedText: previous.translatedText
-            ? wrapCaptionText(nextPreviousRaw, options.maximumCharactersPerLine, options.maximumLines)
-            : null,
+          translatedText: null,
           boundaryReason: 'line-capacity',
         },
         {
@@ -105,9 +94,7 @@ const tryRebalanceWithPrevious = (
             options.maximumCharactersPerLine,
             options.maximumLines,
           ),
-          translatedText: current.translatedText
-            ? wrapCaptionText(nextCurrentRaw, options.maximumCharactersPerLine, options.maximumLines)
-            : null,
+          translatedText: null,
         },
       ];
     }

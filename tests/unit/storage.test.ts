@@ -7,9 +7,9 @@ describe('storage', () => {
     it('returns DEFAULT_SETTINGS when chrome storage is empty', async () => {
       (chrome.storage.local.get as any).mockImplementation((_keys: string[], cb: (r: any) => void) => cb({}));
       const settings = await getSettings();
-      expect(settings.provider).toBe('youtube');
+      expect(settings.provider).toBe('gemini');
       expect(settings.targetLanguage).toBe('English');
-      expect(settings.autoTranslate).toBe(true);
+      expect(settings.autoTranslate).toBe(false);
     });
 
     it('merges saved settings with defaults (new fields get defaults)', async () => {
@@ -39,7 +39,7 @@ describe('storage', () => {
 
       const result = await saveSettings({ targetLanguage: 'French' });
       expect(result.targetLanguage).toBe('French');
-      expect(result.provider).toBe('youtube'); // default preserved
+      expect(result.provider).toBe('gemini'); // stable provider preserved
     });
 
     it('calls chrome.storage.local.set with merged settings', async () => {

@@ -4,6 +4,7 @@ import type { ProviderResponse } from './ProviderResponse';
 
 export interface ProviderContext {
   readonly sessionId: string;
+  readonly videoId?: string;
   readonly sourceLanguage: string;
   readonly targetLanguage: string;
   readonly modelId: string;

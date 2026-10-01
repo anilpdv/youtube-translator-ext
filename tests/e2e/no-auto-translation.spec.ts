@@ -9,6 +9,6 @@ test('does not automatically translate', async ({ page }) => {
 
   // Assert that no translation has occurred. This will depend on the implementation,
   // but we can check that no subtitle overlay has been added to the page.
-  const subtitleOverlay = await page.$('.ai-subtitle-overlay');
+  const subtitleOverlay = await page.$('#yt-ai-subtitle-container');
   expect(subtitleOverlay).toBeNull();
 });

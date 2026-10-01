@@ -54,13 +54,18 @@ export function estimateCaptionLines(text: string, maximumCharactersPerLine: num
   return Math.max(1, lines.length);
 }
 
-export function wrapCaptionText(text: string, maximumCharactersPerLine: number, maximumLines: number): string {
+export function wrapCaptionText(
+  text: string,
+  maximumCharactersPerLine: number,
+  _maximumLines: number,
+): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
   const maxChars = Math.max(1, maximumCharactersPerLine);
-  const maxLines = Math.max(1, maximumLines);
   const lines: string[] = [];
   let current = '';
 
-  for (const word of text.split(/\s+/).filter(Boolean)) {
+  for (const word of normalized.split(/\s+/).filter(Boolean)) {
     const candidate = current ? `${current} ${word}` : word;
     if (current && candidate.length > maxChars) {
       lines.push(current);
@@ -71,5 +76,5 @@ export function wrapCaptionText(text: string, maximumCharactersPerLine: number, 
   }
 
   if (current) lines.push(current);
-  return lines.slice(0, maxLines).join('\n');
+  return lines.join('\n');
 }

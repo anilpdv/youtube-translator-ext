@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { DEFAULT_SETTINGS, ExtensionSettings } from '../../utils/types';
 
 describe('types — DEFAULT_SETTINGS', () => {
-  it('has youtube as default provider (free & instant sync by default)', () => {
-    expect(DEFAULT_SETTINGS.provider).toBe('youtube');
+  it('uses Gemini as the only stable provider route', () => {
+    expect(DEFAULT_SETTINGS.provider).toBe('gemini');
   });
 
   it('has no hardcoded API keys', () => {
@@ -20,8 +20,8 @@ describe('types — DEFAULT_SETTINGS', () => {
     expect(['top', 'bottom']).toContain(DEFAULT_SETTINGS.subtitlePosition);
   });
 
-  it('autoTranslate is on by default', () => {
-    expect(DEFAULT_SETTINGS.autoTranslate).toBe(true);
+  it('does not authorize translation by default', () => {
+    expect(DEFAULT_SETTINGS.autoTranslate).toBe(false);
   });
 
   it('no voice-related fields exist', () => {

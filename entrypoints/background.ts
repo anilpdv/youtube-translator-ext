@@ -1,4 +1,3 @@
-import { translateDirectly } from '../utils/translationEngine';
 import { TranslationGateway } from '../background/TranslationGateway';
 import { validateTranslationMessage } from '../background/messages/validateTranslationMessage';
 import { GeminiProvider } from '../translation/providers/GeminiProvider';
@@ -92,33 +91,6 @@ export default defineBackground(() => {
             error: error instanceof Error ? error.message : 'Translation failed.',
           }),
         );
-      return true;
-    }
-    if (message?.type === 'TRANSLATE_BATCH_REQUEST') {
-      const { segments, settings, contextTitle, previousCue, nextCue } = message.payload || {};
-      translateDirectly(segments || [], settings, contextTitle || '', previousCue, nextCue)
-        .then((translated) => {
-          sendResponse({ success: true, data: translated });
-        })
-        .catch((err) => {
-          sendResponse({ success: false, error: err?.message || 'Translation failed in background' });
-        });
-      return true; // Keep message channel open for asynchronous sendResponse
-    }
-
-    if (message?.type === 'GET_OLLAMA_MODELS') {
-      const endpoint = message.endpoint || 'http://localhost:11434';
-      fetch(`${endpoint.replace(/\/+$/, '')}/api/tags`)
-        .then((res) => res.json())
-        .then((data) => {
-          const models = Array.isArray(data?.models)
-            ? data.models.map((m: any) => m.name || m.model).filter(Boolean)
-            : [];
-          sendResponse({ success: true, models });
-        })
-        .catch((err) => {
-          sendResponse({ success: false, error: err?.message, models: [] });
-        });
       return true;
     }
   });

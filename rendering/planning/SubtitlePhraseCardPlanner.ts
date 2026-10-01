@@ -64,7 +64,7 @@ const buildCard = (
     startMs: units[0]?.startMs ?? 0,
     endMs: units.at(-1)?.endMs ?? 0,
     originalText: text,
-    translatedText: text,
+    translatedText: null,
     sourceLanguage: input.sourceLanguage,
     targetLanguage: input.targetLanguage,
     timingSource: input.timingSource,
@@ -126,6 +126,10 @@ export class SubtitlePhraseCardPlanner {
     for (let index = 0; index < units.length; index += 1) {
       const unit = units[index];
       const nextUnit = units[index + 1] ?? null;
+      const previousUnit = accumulator.getUnits().at(-1);
+      if (previousUnit && previousUnit.parentCueId !== unit.parentCueId) {
+        commit(accumulator.getUnits().length - 1, 'source-cue-end');
+      }
       accumulator.add(unit);
 
       const snapshot = accumulator.snapshot(this.options.maximumCharactersPerLine);
@@ -163,7 +167,7 @@ export class SubtitlePhraseCardPlanner {
     }
 
     const rebalanced = rebalancePhraseCards(cards, this.options);
-    validatePhraseCards(rebalanced);
+    validatePhraseCards(rebalanced, this.options);
     return rebalanced;
   }
 }

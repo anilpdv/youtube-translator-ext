@@ -72,6 +72,10 @@ export interface ExtensionSettings {
   ollamaModel: string;     // Local model (default: qwen2.5:0.5b or llama3.2:1b)
   sourceLanguage: string;  // 'auto' or 'de', 'es', 'ja', etc.
   targetLanguage: string;
+  /**
+   * @deprecated This legacy preference only controls popup visibility. It must
+   * never authorize translation; activation is always per-video and explicit.
+   */
   autoTranslate: boolean;
 
   // Subtitle appearance - Text
@@ -108,7 +112,7 @@ export interface ExtensionSettings {
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
-  provider: 'youtube',
+  provider: 'gemini',
   apiKey: '',
   openrouterKey: '',
   openrouterModel: 'openai/gpt-4o-mini',
@@ -116,7 +120,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   ollamaModel: 'gemma2:2b',
   sourceLanguage: 'auto',
   targetLanguage: 'English',
-  autoTranslate: true,
+  autoTranslate: false,
 
   // Text
   subtitleFontSize: 24,

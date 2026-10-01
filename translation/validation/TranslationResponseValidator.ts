@@ -82,6 +82,7 @@ export class TranslationResponseValidator {
         translatedText: item!.translation.trim(),
         startMs: source.startMs,
         endMs: source.endMs,
+        timingSource: source.timingSource,
       };
     });
   }

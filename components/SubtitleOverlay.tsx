@@ -46,13 +46,13 @@ const getAlignmentItems = (alignment: ExtensionSettings['subtitleAlignment']): R
   }
 };
 
-const wrapStableCaptionText = (text: string, maxLines: number, maxCharactersPerLine: number): string[] => {
+const wrapStableCaptionText = (text: string, maxCharactersPerLine: number): string[] => {
   if (text.includes('\n')) {
     const explicitLines = text
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean);
-    if (explicitLines.length > 0) return explicitLines.slice(0, Math.max(1, maxLines));
+    if (explicitLines.length > 0) return explicitLines;
   }
 
   const lines: string[] = [];
@@ -70,7 +70,7 @@ const wrapStableCaptionText = (text: string, maxLines: number, maxCharactersPerL
   }
 
   if (current) lines.push(current);
-  return lines.slice(0, Math.max(1, maxLines));
+  return lines;
 };
 
 export const SubtitleOverlay: React.FC<Props> = ({
@@ -156,10 +156,11 @@ export const SubtitleOverlay: React.FC<Props> = ({
 
   const captionLineStyle = (size: number, weight: number, opacity = 1): React.CSSProperties => ({
     display: 'block',
-    overflow: 'hidden',
+    overflow: 'visible',
     maxWidth: '100%',
-    whiteSpace: 'nowrap',
-    textOverflow: 'clip',
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'normal',
+    wordBreak: 'normal',
     textAlign: settings.subtitleAlignment || 'center',
     fontSize: `${size}px`,
     lineHeight,
@@ -180,7 +181,6 @@ export const SubtitleOverlay: React.FC<Props> = ({
   ) => {
     const lines = wrapStableCaptionText(
       text,
-      Math.min(2, settings.subtitleMaxLines || 2),
       Math.min(42, settings.subtitleMaxCharactersPerLine || 42),
     );
 

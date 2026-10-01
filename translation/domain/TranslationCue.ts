@@ -6,6 +6,7 @@ export interface SourceTranslationCue {
   readonly endMs: number;
   readonly text: string;
   readonly context?: { readonly previousText?: string; readonly nextText?: string };
+  readonly timingSource?: 'word-timing' | 'cue-timing' | 'estimated';
 }
 
 export interface TranslatedCue {
@@ -16,4 +17,5 @@ export interface TranslatedCue {
   readonly translatedText: string;
   readonly startMs: number;
   readonly endMs: number;
+  readonly timingSource?: 'word-timing' | 'cue-timing' | 'estimated';
 }

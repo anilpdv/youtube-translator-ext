@@ -1,6 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as engineModule from '../../utils/translationEngine';
-import { DEFAULT_SETTINGS } from '../../utils/types';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 describe('Background Service Worker Message Handler', () => {
   let messageListener: any = null;
@@ -8,90 +6,41 @@ describe('Background Service Worker Message Handler', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     messageListener = null;
-
-    (chrome.runtime.onMessage.addListener as any) = vi.fn((fn) => {
+    (chrome.runtime.onMessage.addListener as any) = vi.fn((fn: any) => {
       messageListener = fn;
     });
-
+    (chrome.tabs.query as any) = vi.fn((_query: unknown, callback: (tabs: any[]) => void) =>
+      callback([{ id: 7, url: 'https://www.youtube.com/watch?v=video' }]),
+    );
+    (chrome.tabs.sendMessage as any) = vi.fn((_tabId: number, _message: unknown, callback: (response: unknown) => void) =>
+      callback({ ok: true, data: { status: 'idle' } }),
+    );
     (global as any).defineBackground = (fn: any) => ({ main: fn });
     (global as any).browser = {
-      runtime: {
-        onInstalled: { addListener: vi.fn() },
-      },
+      runtime: { onInstalled: { addListener: vi.fn() } },
     };
-
     const bgModule = await import('../../entrypoints/background');
-    if (typeof bgModule.default === 'function') {
-      (bgModule.default as any)();
-    } else if (bgModule.default?.main) {
-      bgModule.default.main();
-    }
+    if (typeof bgModule.default === 'function') (bgModule.default as any)();
+    else if (bgModule.default?.main) bgModule.default.main();
   });
 
-  it('handles TRANSLATE_BATCH_REQUEST and invokes translateDirectly with context cues', async () => {
-    const mockSegments = [{ start: 0, dur: 3, text: 'Hello world' }];
-    const prevCue = { start: -3, dur: 3, text: 'Previous' };
-    const nextCue = { start: 3, dur: 3, text: 'Next' };
-    const mockTranslated = [{ start: 0, dur: 3, text: 'Hello world', translatedText: 'Hola mundo' }];
-
-    vi.spyOn(engineModule, 'translateDirectly').mockResolvedValueOnce(mockTranslated);
-
-    expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled();
+  it('forwards validated application commands to the active YouTube content runtime', () => {
     expect(messageListener).toBeTruthy();
-
     const sendResponse = vi.fn();
-    const isAsync = messageListener(
-      {
-        type: 'TRANSLATE_BATCH_REQUEST',
-        payload: {
-          segments: mockSegments,
-          settings: { ...DEFAULT_SETTINGS, provider: 'ollama' },
-          contextTitle: 'Test Video',
-          previousCue: prevCue,
-          nextCue: nextCue,
-        },
-      },
-      {},
-      sendResponse
-    );
-
+    const isAsync = messageListener({ type: 'application.get-state' }, {}, sendResponse);
     expect(isAsync).toBe(true);
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(engineModule.translateDirectly).toHaveBeenCalledWith(
-      mockSegments,
-      expect.objectContaining({ provider: 'ollama' }),
-      'Test Video',
-      prevCue,
-      nextCue
-    );
-    expect(sendResponse).toHaveBeenCalledWith({
-      success: true,
-      data: mockTranslated,
-    });
+    expect(chrome.tabs.query).toHaveBeenCalled();
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7, { type: 'application.get-state' }, expect.any(Function));
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true, data: { status: 'idle' } });
   });
 
-  it('sends error response when translateDirectly fails', async () => {
-    vi.spyOn(engineModule, 'translateDirectly').mockRejectedValueOnce(
-      new Error('Cannot connect to Ollama')
-    );
-
-    expect(messageListener).toBeTruthy();
-
+  it('rejects application commands when there is no active YouTube tab', () => {
+    (chrome.tabs.query as any).mockImplementation((_query: unknown, callback: (tabs: any[]) => void) => callback([]));
     const sendResponse = vi.fn();
-    messageListener(
-      {
-        type: 'TRANSLATE_BATCH_REQUEST',
-        payload: { segments: [], settings: DEFAULT_SETTINGS, contextTitle: '' },
-      },
-      {},
-      sendResponse
-    );
-
-    await new Promise((r) => setTimeout(r, 10));
+    messageListener({ type: 'application.get-state' }, {}, sendResponse);
     expect(sendResponse).toHaveBeenCalledWith({
-      success: false,
-      error: 'Cannot connect to Ollama',
+      ok: false,
+      error: { code: 'NO_ACTIVE_TAB', message: 'No active browser tab is available.' },
     });
   });
 });

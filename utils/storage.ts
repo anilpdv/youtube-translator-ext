@@ -7,8 +7,9 @@ export const getSettings = async (): Promise<ExtensionSettings> => {
         if (result && result.yt_ai_settings) {
           // Merge saved settings with defaults (handles new fields gracefully)
           const loaded: ExtensionSettings = { ...DEFAULT_SETTINGS, ...result.yt_ai_settings };
-          // Migrate legacy voice provider values
-          if ((loaded.provider as string) === 'openrouter') loaded.provider = 'openrouter';
+          // Stable V1 has one provider path. Legacy provider selections remain
+          // persisted for migration but cannot activate translation.
+          if (loaded.provider !== 'gemini') loaded.provider = 'gemini';
           resolve(loaded);
         } else {
           resolve({ ...DEFAULT_SETTINGS });

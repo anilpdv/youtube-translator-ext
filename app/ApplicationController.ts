@@ -268,13 +268,9 @@ export class ApplicationController {
           : null,
       providerId,
       modelId,
-      providerReady: providerId === 'gemini'
-        ? this.settings.apiKey.trim().length > 0 && modelId.length > 0
-        : false,
+      providerReady: providerId === 'gemini' && modelId.length > 0,
       providerMessage: providerId === 'gemini'
-        ? this.settings.apiKey.trim()
-          ? 'Gemini is configured.'
-          : 'Configure a Gemini API key.'
+          ? 'Gemini is selected. The background worker will validate the API key.'
         : 'This provider is not enabled in the stable workflow.',
       targetLanguage: active?.targetLanguage ?? this.settings.targetLanguage,
     };
@@ -325,6 +321,7 @@ export class ApplicationController {
     });
     const session = this.createTranslationSession({
       videoId,
+      captionTrackId: input.captionTrackId,
       targetLanguage: input.targetLanguage,
       providerId: input.providerId,
       modelId: input.modelId,
@@ -364,7 +361,16 @@ export class ApplicationController {
 
   async setSubtitlesEnabled(enabled: boolean): Promise<void> {
     this.store.update({ subtitlesEnabled: enabled });
-    if (!enabled) await this.dependencies.rendering?.clear();
+    if (!enabled) {
+      await this.dependencies.rendering?.clear();
+      this.store.update({ renderingActive: false });
+      return;
+    }
+    const document = this.store.getSnapshot().translationDocument;
+    if (document && this.dependencies.rendering) {
+      await this.dependencies.rendering.show(document, this.store.getSnapshot().subtitleDisplay);
+      this.store.update({ renderingActive: true });
+    }
   }
 
   async clearCurrentTranslation(): Promise<void> {

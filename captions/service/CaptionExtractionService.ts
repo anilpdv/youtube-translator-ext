@@ -9,7 +9,6 @@ import type { CaptionFetcher } from '../fetching/CaptionFetcher';
 import type { CaptionNormalizer } from '../normalization/CaptionNormalizer';
 import type { CaptionParserRegistry } from '../parsing/CaptionParserRegistry';
 import type { CaptionValidator } from '../validation/CaptionValidator';
-import { RollingCaptionNormalizer } from '../normalization/RollingCaptionNormalizer';
 
 export interface ExtractCaptionsRequest {
   readonly videoId: string;
@@ -46,9 +45,10 @@ export class CaptionExtractionService {
     }
     const rawCues = this.parsers.get(response.format).parse(response.body, signal);
     const canonicalCues = this.normalizer.normalize(rawCues, signal);
-    const cues = new RollingCaptionNormalizer().normalize(
-      canonicalCues, track.languageCode,
-    );
+    // Stable V1 preserves the canonical source cues exactly. Rolling deltas
+    // belong to the experimental live-caption path and must not rewrite the
+    // prerecorded caption document before phrase planning.
+    const cues = canonicalCues;
     const report = this.validator.validate(cues);
     if (!report.valid) {
       throw new CaptionError({

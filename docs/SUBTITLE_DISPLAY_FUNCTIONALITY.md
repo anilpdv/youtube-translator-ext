@@ -1,397 +1,167 @@
-# Subtitle Display Functionality
-
-This note documents the subtitle display behavior added for the YouTube video overlay. It covers only the display path: how subtitle text is grouped, selected by playback time, mounted into YouTube, and rendered on top of the video.
-
-## Goal
-
-The extension should show subtitles like stable YouTube caption cards:
-
-- group words into readable phrases
-- show one immutable card for its whole media-time interval
-- replace the card only at a phrase, punctuation, line-capacity, or duration boundary
-- never animate individual words or characters
-- never append every new word to the current visible subtitle
-- never show a long paragraph all at once
-- never let the visible subtitle exceed two lines
-
-The important rule is:
-
-> One subtitle interval equals one stable subtitle card.
-
-After a card appears, its text must not change. React should rerender only when the active card changes.
-
-## Main Active Display Path
-
-These files are used by the current YouTube content-script overlay.
-
-### `entrypoints/content.tsx`
-
-This is the active browser content script for YouTube watch pages.
-
-Display responsibilities:
-
-- mounts the subtitle overlay into YouTube's player
-- hides native YouTube captions while AI subtitles are active
-- converts translated cues into stable phrase cards
-- tracks video playback time
-- selects the active card using `findActiveCue`
-- rerenders the overlay only when the active card index changes
-
-Important functions:
-
-- `createPhraseCardTrack(track)`
-  - converts translated cue text into phrase-card display segments
-  - uses `SubtitlePhraseCardPlanner`
-  - returns `TranslatedSegment[]` that the existing overlay can render
-
-- `renderOverlay()`
-  - finds the YouTube player
-  - gets the currently active subtitle card
-  - renders `<SubtitleOverlay />` into the player
-
-- `setupVideoListeners()`
-  - listens to video `timeupdate` and `seeking`
-  - updates `runtimeState.activeIndex`
-  - calls `renderOverlay()` only when the active card changes
-
-### `components/SubtitleOverlay.tsx`
-
-This is the visible subtitle component.
-
-Display responsibilities:
-
-- renders the active phrase card
-- draws the stable black subtitle panel
-- wraps text into at most two visible lines
-- applies font size, color, alignment, position, opacity, and shadow settings
-- handles bilingual display when enabled
-- does not do word timing, animation, or progressive reveal
-
-Important logic:
-
-- `wrapStableCaptionText(text, maxLines, maxCharactersPerLine)`
-  - preserves planner-provided newlines
-  - defensively wraps plain text
-  - returns at most two lines
-
-- `renderCaptionText(...)`
-  - renders each subtitle line with `whiteSpace: 'nowrap'`
-  - prevents browser-created third lines
-
-The component intentionally does not use `currentTime` to change text.
-
-### `utils/subtitleRuntime.ts`
-
-This file contains playback-time lookup logic for the active content script.
-
-Important function:
-
-- `findActiveCue(track, time, currentIndex, syncOffsetMs)`
-  - finds the subtitle card whose interval contains the current media time
-  - supports seeking by falling back to a full search when needed
-  - uses media time, not wall-clock animation
-
-### `utils/safeRootRenderer.tsx`
-
-This safely owns React roots inside YouTube's constantly changing DOM.
-
-Display responsibilities:
-
-- creates React roots for injected overlay containers
-- recreates roots if YouTube replaces the player DOM
-- unmounts old roots safely
-
-## Phrase-Card Planning
-
-The phrase-card planner converts word-level or estimated timing units into stable display cards.
-
-### `rendering/planning/SubtitlePhraseCardPlanner.ts`
-
-This is the main phrase-card planner.
-
-Default behavior:
-
-- minimum card duration: `1_200 ms`
-- preferred card duration: `2_400 ms`
-- maximum card duration: `5_000 ms`
-- preferred words per card: `9`
-- maximum words per card: `14`
-- maximum characters per line: `42`
-- maximum lines: `2`
-- silence boundary: `350 ms`
-
-Important exports:
-
-- `SubtitlePhraseCardPlanner`
-  - accumulates timed text units into readable phrase cards
-  - commits cards at sentence, silence, punctuation, capacity, or duration boundaries
-  - validates that cards do not overlap or repeat large text prefixes
-
-- `createEstimatedTimedTextUnits(...)`
-  - estimates word timing inside cue-level subtitles
-  - used when YouTube does not provide true word timing
-  - timing is only used to determine phrase card boundaries
-
-Important internal behavior:
-
-1. Sort timed units by start time.
-2. Add units to a `PhraseAccumulator`.
-3. Classify the current boundary.
-4. Decide whether the pending phrase should commit.
-5. If line capacity is exceeded, backtrack to the best prior boundary.
-6. Build one immutable `SubtitlePhraseCard`.
-7. Rebalance tiny trailing cards.
-8. Validate final cards.
-
-### `rendering/planning/PhraseAccumulator.ts`
-
-This accumulates pending timed text units before a card is committed.
-
-Important snapshot fields:
-
-- `text`
-- `startMs`
-- `endMs`
-- `durationMs`
-- `wordCount`
-- `characterCount`
-- `estimatedLines`
-
-The planner uses snapshots to decide whether the pending phrase is readable.
-
-### `rendering/planning/classifyPhraseBoundary.ts`
-
-Classifies natural boundaries.
-
-Priority:
-
-1. sentence punctuation: `.`, `?`, `!`, `...`
-2. silence gap of at least `350 ms`
-3. clause punctuation: `,`, `;`, `:`, dash
-4. no boundary
-
-### `rendering/planning/shouldCommitPhraseCard.ts`
-
-Decides whether a pending phrase becomes a card.
-
-Commits when:
-
-- line capacity is exceeded
-- maximum words are reached
-- maximum duration is reached
-- a sentence ends
-- a silence boundary appears after the minimum duration
-- a clause boundary appears near preferred size or duration
-- the source cue ends
-
-Line capacity is checked before duration so the planner does not create a card that would need visual truncation.
-
-### `rendering/planning/rebalancePhraseCards.ts`
-
-Post-processes cards after planning.
-
-Responsibilities:
-
-- merge tiny cards when possible
-- rebalance tiny trailing fragments
-- move words and timing together when the final card would be too short
-- preserve card order
-- keep cards within the two-line/word-count constraints
-
-This avoids bad output like a 500 ms card containing only `capitalism.`.
-
-### `rendering/planning/joinCaptionUnits.ts`
-
-Text utility functions.
-
-Important functions:
-
-- `joinCaptionUnits(units)`
-  - joins text without bad punctuation spacing
-  - produces `Hello, world.`
-  - avoids `Hello , world .`
-
-- `countReadingUnits(text)`
-  - counts words for space-separated languages
-  - counts characters for CJK text
-
-- `estimateCaptionLines(text, maxChars)`
-  - estimates how many lines a card needs
-
-- `wrapCaptionText(text, maxChars, maxLines)`
-  - wraps card text to the visual limits
-
-### `rendering/planning/validatePhraseCards.ts`
-
-Validation helpers.
-
-Checks:
-
-- no duplicate IDs
-- valid start/end times
-- no overlapping cards
-- no large text overlap between adjacent cards
-
-Important function:
-
-- `hasLargeTextOverlap(previous, next)`
-  - detects cumulative-window behavior
-  - prevents card 2 from repeating most of card 1
-
-## Display Domain Types
-
-### `rendering/domain/SubtitlePhraseCard.ts`
-
-Defines the stable phrase-card data model.
-
-Important fields:
-
-- `id`
-- `parentCueIds`
-- `startMs`
-- `endMs`
-- `originalText`
-- `translatedText`
-- `timingSource`
-- `boundaryReason`
-- `stable: true`
-
-### `rendering/domain/SubtitlePhraseTrack.ts`
-
-Defines a phrase-card track:
-
-- video/session metadata
-- source and target language
-- card list
-- duration
-- planning version
-
-## Compatibility Rendering Path
-
-The repo also has a rendering service path under `rendering/*`. It is related to subtitle display and was updated so it uses phrase-card planning instead of rolling windows.
-
-Important files:
-
-- `rendering/planning/SubtitleDisplayPlanner.ts`
-  - compatibility wrapper around `SubtitlePhraseCardPlanner`
-  - returns `SubtitleDisplaySlice[]`
-  - sets `cumulativeWindow: false`
-
-- `rendering/planning/SubtitleDisplayPlannerOptions.ts`
-  - maps old slice planner option names to phrase-card defaults
-
+# Subtitle display functionality
+
+This document describes the single subtitle display path used by the packaged
+extension. It covers extraction handoff, phrase-card planning, translation
+mapping, media-time scheduling, and the overlay. Translation starts only after
+the user presses the popup or in-player Translate button for the current video.
+
+## Runtime path
+
+```text
+entrypoints/content.tsx
+  -> content/createContentApplication.ts
+  -> ApplicationController
+  -> CaptionExtractionService
+  -> TranslationService / BackgroundTranslationProvider
+  -> TranslationDocument
+  -> SubtitleRenderingService
+  -> createSubtitleDisplayTrack
+  -> SubtitleScheduler
+  -> OverlayController
+  -> rendering/overlay/SubtitleOverlay.tsx
+```
+
+The popup uses `PopupController` and `PopupRuntimeClient`. It sends commands to
+the content application through the validated background message protocol; it
+does not translate directly.
+
+The background owns provider credentials. The content script sends phrase-card
+IDs and source text, never API keys. Stable V1 has one provider path: Gemini
+with the selected model. It does not silently switch to another provider.
+
+## Activation and navigation
+
+`entrypoints/content.tsx` is a composition root. It creates the domain
+application, registers the message handler, starts it, and disposes it on
+teardown. Navigation creates a new session and clears the prior activation.
+
+The runtime keeps explicit per-video activation state. Loading a page, opening
+the popup, loading settings, or finding a cache entry cannot start translation.
+The first explicit start command authorizes exactly one workflow for that video.
+Toggling an already translated track only changes visibility and does not write
+an automatic-translation preference.
+
+The extension does not click, enable, disable, or hide YouTube's native CC
+button. Caption extraction uses timed-text data from the caption track.
+
+## Source phrase-card planning
+
+`translation/adapters/createTranslationPhraseCards.ts` is the only active
+translation planning adapter. It runs once before provider translation, once
+per source cue:
+
+1. Use exact JSON3/WebVTT timing units when available.
+2. Estimate word timing inside the source cue only when exact units are absent.
+3. Feed those units to `SubtitlePhraseCardPlanner`.
+4. Preserve each card ID, parent cue ID, source text, and media interval.
+5. Send those cards directly to the translation batcher.
+
+`SubtitlePhraseCardPlanner` creates immutable, non-cumulative cards. Its default
+limits are:
+
+- minimum duration: 1,200 ms
+- preferred duration: 2,400 ms
+- maximum duration: 5,000 ms
+- preferred words: 9
+- maximum words: 14
+- maximum characters per line: 42
+- maximum lines: 2
+- silence boundary: 350 ms
+
+Sentence boundaries are preferred, followed by silence, clause punctuation,
+line capacity, duration, and a word-boundary fallback. If a new unit would
+exceed two lines or the word limit, the planner backtracks to the latest
+natural boundary before committing. Cards never cross parent source cues.
+
+`PhraseAccumulator` preserves the complete pending text and timing. Joining
+units keeps punctuation spacing correct (`Hello, world.` rather than
+`Hello , world .`). `rebalancePhraseCards` merges or rebalances tiny trailing
+cards without manufacturing translated text. `validatePhraseCards` rejects
+overlong, overlapping, duplicate, or truncated cards.
+
+There is no typewriter effect, word reveal, character reveal, rolling window, or
+cumulative prefix progression in the stable prerecorded path. Fine-grained
+timing determines card boundaries; it does not rewrite the visible caption for
+each word.
+
+## Translation contract
+
+`TranslationBatcher` consumes the planned phrase cards directly. The batching
+version is `batching-v3-stable-phrase-cards`, which invalidates incompatible
+progressive-slice cache entries.
+
+`TranslationPromptBuilder` requires exactly one JSON result for every phrase
+ID. Providers must preserve IDs, cannot split or combine cards, and cannot
+translate context fields. `TranslationResponseValidator` rejects missing,
+duplicate, unknown, empty, or extra IDs. Neighboring phrase text is context
+only.
+
+## Display track
+
+`rendering/adapters/createSubtitleRenderTrack.ts` maps translated phrase cues
+directly to `SubtitleDisplaySlice` records. It does not plan, wrap, split, or
+re-time translated text. `cumulativeWindow` is always `false`.
+
+When translation is partial, uncovered source cues are retained as
+untranslated fallback slices. This keeps source text visible without changing
+the translated phrase-card timeline. The adapter validates video identity,
+unique IDs, positive timing, and non-overlapping slices.
+
+## Scheduling and rendering
+
+`SubtitleScheduler` uses `video.currentTime` as media time. It binary-searches
+the immutable display track, emits only when the active card or playback state
+changes, and handles seeking and playback-rate changes. Pausing clears future
+wake timers and freezes the current card. Seeking selects the matching whole
+card immediately; it does not replay earlier words.
+
+`SubtitleRenderingService` owns the render track and player lifecycle.
+`OverlayController` mounts `rendering/overlay/SubtitleOverlay.tsx` in the
+YouTube player. The overlay receives one complete card and does not mutate it
+while its interval is active.
+
+The overlay and `components/SubtitleOverlay.tsx` compatibility path use
+non-destructive wrapping: `pre-wrap`, visible overflow, and normal word
+boundaries. No line clamp, hidden overflow, `nowrap`, or array slicing is used
+to delete text. The planner is responsible for producing cards that fit two
+lines; validation catches a planner failure instead of hiding the extra text.
+
+## Relevant files
+
+### Active runtime
+
+- `entrypoints/content.tsx`
+- `content/createContentApplication.ts`
+- `content/BackgroundTranslationProvider.ts`
+- `app/ApplicationController.ts`
+- `captions/service/CaptionExtractionService.ts`
+- `translation/adapters/createTranslationPhraseCards.ts`
+- `translation/batching/TranslationBatcher.ts`
+- `translation/execution/TranslationCoordinator.ts`
+- `background/TranslationGateway.ts`
 - `rendering/adapters/createSubtitleRenderTrack.ts`
-  - builds display tracks from translation documents
-
+- `rendering/service/SubtitleRenderingService.ts`
 - `rendering/scheduling/SubtitleScheduler.ts`
-  - schedules active card changes
-  - now rerenders on active-card changes, not every player event
-
-- `rendering/scheduling/CueIndex.ts`
-  - efficient active-card lookup
-
-- `rendering/scheduling/findCueAtTime.ts`
-  - binary search helper for media-time lookup
-
 - `rendering/overlay/SubtitleOverlay.tsx`
-  - overlay component used by the rendering service path
-
 - `rendering/overlay/subtitleOverlay.css`
-  - CSS for the rendering service overlay
+- `rendering/overlay/OverlayController.ts`
+- `entrypoints/popup/App.tsx`
+- `popup/app/PopupController.ts`
+- `popup/runtime/PopupRuntimeClient.ts`
 
-## Removed/Disabled Behavior
+### Planning and validation
 
-The stable display path no longer uses:
+- `rendering/planning/SubtitlePhraseCardPlanner.ts`
+- `rendering/planning/PhraseAccumulator.ts`
+- `rendering/planning/classifyPhraseBoundary.ts`
+- `rendering/planning/shouldCommitPhraseCard.ts`
+- `rendering/planning/rebalancePhraseCards.ts`
+- `rendering/planning/joinCaptionUnits.ts`
+- `rendering/planning/validatePhraseCards.ts`
+- `captions/parsers/Json3CaptionParser.ts`
+- `captions/domain/CaptionTimingUnit.ts`
+- `translation/validation/TranslationResponseValidator.ts`
 
-- word-by-word reveal
-- character reveal
-- cumulative rolling windows
-- appending text to the current visible subtitle
-- `currentTime` inside the React overlay to mutate text
-- one display card per word/timing unit
-
-The old `rendering/planning/createRollingWindows.ts` helper was removed from the stable path.
-
-The old `rollingSubtitleText` utility and test were removed from `utils/transcript.ts` and `tests/unit/transcript.test.ts`.
-
-## Runtime Flow
-
-The active display flow is:
-
-```text
-translated cue track
-  -> createEstimatedTimedTextUnits()
-  -> SubtitlePhraseCardPlanner.plan()
-  -> stable phrase-card TranslatedSegment[]
-  -> video timeupdate/seeking
-  -> findActiveCue()
-  -> renderOverlay()
-  -> SubtitleOverlay
-```
-
-The viewer sees:
-
-```text
-Card 1 stays unchanged for its interval
-Card 2 replaces Card 1 once at the boundary
-Card 3 replaces Card 2 once at the boundary
-```
-
-The viewer does not see:
-
-```text
-"As"
-"As a"
-"As a conservative"
-"As a conservative she"
-```
-
-## Tests Added/Updated
-
-### `tests/rendering/SubtitleDisplayPlanner.test.ts`
-
-Covers:
-
-- long cues split into deterministic phrase cards
-- no one-card-per-word behavior
-- normal cards stay visible at least `1_200 ms`
-- no large copied prefix between adjacent cards
-- sentence boundaries are preferred
-- scheduler does not rerender while the same card remains active
-- scheduler changes once at the next card boundary
-
-### `tests/component/SubtitleOverlay.test.tsx`
-
-Covers:
-
-- subtitle rendering
-- status rendering
-- style settings
-- two-line rendering
-- stable full-width caption panel
-- no browser-created third line
-
-### `tests/rendering/findCueAtTime.test.ts`
-
-Covers media-time lookup behavior:
-
-- inclusive cue start
-- exclusive cue end
-- gaps
-- overlapping cue preference
-
-## Verification Commands
-
-The implementation was verified with:
-
-```bash
-npm run compile
-npm test -- tests/rendering/SubtitleDisplayPlanner.test.ts tests/rendering/createSubtitleRenderTrack.test.ts tests/rendering/findCueAtTime.test.ts tests/component/SubtitleOverlay.test.tsx tests/unit/transcript.test.ts
-npm run build
-```
-
-The production extension bundle is generated in:
-
-```text
-.output/chrome-mv3
-```
+Legacy files may remain temporarily for compatibility tests, but they are not
+imported by the active content, popup, or background runtime. The active path
+has one planner, one scheduler, one overlay, and one provider route.

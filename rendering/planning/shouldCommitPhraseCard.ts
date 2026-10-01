@@ -28,7 +28,7 @@ export function shouldCommitPhraseCard(input: {
   }
 
   if (reachedMaximumWords) {
-    return { commit: true, forced: false, reason: 'line-capacity' };
+    return { commit: true, forced: true, reason: 'line-capacity' };
   }
 
   if (reachedMaximumDuration) {
@@ -36,6 +36,9 @@ export function shouldCommitPhraseCard(input: {
   }
 
   if (boundary.strength === 'sentence') {
+    if (belowMinimum && input.nextUnit) {
+      return { commit: false, forced: false, reason: null };
+    }
     return { commit: true, forced: false, reason: 'sentence' };
   }
 

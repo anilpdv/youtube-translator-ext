@@ -41,17 +41,15 @@ export class CaptionNormalizer {
           : raw.durationMs !== undefined && raw.durationMs !== null
             ? startMs + Math.round(raw.durationMs)
             : this.inferEnd(rawCues, index, startMs);
+      const safeEndMs = endMs > startMs ? endMs : startMs + 1;
       normalized.push({
         id: `cue-${startMs}-${index}`,
         startMs,
-        endMs: Math.max(
-          startMs + this.options.minimumDurationMs,
-          endMs,
-        ),
+        endMs: safeEndMs,
         text,
         timingUnits: this.createTimingUnits(
           `cue-${startMs}-${index}`, raw, startMs,
-          Math.max(startMs + this.options.minimumDurationMs, endMs),
+          safeEndMs,
         ),
         sourceBehavior: raw.sourceBehavior ?? 'static',
       });

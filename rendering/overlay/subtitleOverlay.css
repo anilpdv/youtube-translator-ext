@@ -2,7 +2,7 @@
   position: absolute;
   inset: 0;
   z-index: 40;
-  overflow: hidden;
+  overflow: visible;
   pointer-events: none;
   contain: layout style paint;
 }
@@ -30,9 +30,9 @@
   border-radius: 0.25em;
   color: #fff;
   background: rgb(0 0 0 / var(--ai-subtitle-background-opacity, 0.72));
-  overflow: hidden;
+  overflow: visible;
 }
-.ai-subtitle-translated, .ai-subtitle-original { overflow-wrap: anywhere; white-space: pre-wrap; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.ai-subtitle-translated, .ai-subtitle-original { overflow: visible; overflow-wrap: normal; word-break: normal; white-space: pre-wrap; }
 .ai-subtitle-translated { font-weight: 650; }
 .ai-subtitle-original { margin-top: 0.2em; font-size: 0.78em; font-weight: 450; opacity: 0.9; }
 .ai-subtitle-unavailable { font-style: italic; opacity: 0.88; }

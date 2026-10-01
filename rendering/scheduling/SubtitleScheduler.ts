@@ -62,6 +62,11 @@ export class SubtitleScheduler {
         playing,
       });
     }
+    if (playback.paused) {
+      if (this.timer !== null) clearTimeout(this.timer);
+      this.timer = null;
+      return;
+    }
     this.scheduleNextWake(adjustedTime, visibleIndex, playback.playbackRate);
   }
 

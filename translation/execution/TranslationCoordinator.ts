@@ -111,6 +111,7 @@ export class TranslationCoordinator {
         try {
           response = await this.provider.translateBatch(batch, {
             sessionId: request.sessionId,
+            videoId: request.videoId,
             sourceLanguage: request.sourceLanguage,
             targetLanguage: request.targetLanguage,
             modelId: request.modelId,

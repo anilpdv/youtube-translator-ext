@@ -10,8 +10,10 @@ import {
   Sliders,
 } from 'lucide-react';
 import { getSettings, saveSettings } from '../../utils/storage';
-import { DEFAULT_SETTINGS, type ExtensionSettings, type TranslationStateSnapshot } from '../../utils/types';
-import { isBuiltinAIAvailable, translateBatch } from '../../utils/translationEngine';
+import { DEFAULT_SETTINGS, type ExtensionSettings } from '../../utils/types';
+import { PopupController } from '../../popup/app/PopupController';
+import { PopupRuntimeClient } from '../../popup/messaging/PopupRuntimeClient';
+import type { PopupState as DomainPopupState } from '../../popup/app/PopupState';
 
 const SOURCE_LANGUAGES: [string, string][] = [
   ['auto', 'Auto detect'],
@@ -156,64 +158,33 @@ export const App: React.FC = () => {
   const [settings, setSettings] = useState<ExtensionSettings>(DEFAULT_SETTINGS);
   const [state, setState] = useState<PopupState>('idle');
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const [builtinAvailable, setBuiltinAvailable] = useState<boolean>(false);
   const [isEngineDrawerOpen, setIsEngineDrawerOpen] = useState<boolean>(false);
   const [isAppearanceDrawerOpen, setIsAppearanceDrawerOpen] = useState<boolean>(false);
+  const [modelId, setModelId] = useState('gemini-2.5-flash');
+  const [domainState, setDomainState] = useState<DomainPopupState | null>(null);
+  const controllerRef = React.useRef<PopupController | null>(null);
 
   useEffect(() => {
-    // 1. Load persisted settings
     getSettings().then((loaded) => setSettings(loaded));
-    setBuiltinAvailable(isBuiltinAIAvailable());
-
-    // 2. Query active YouTube tab to restore state
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0];
-        if (!activeTab?.id || !activeTab.url?.includes('youtube.com/watch')) {
-          return;
-        }
-
-        chrome.tabs.sendMessage(
-          activeTab.id,
-          { type: 'GET_TRANSLATION_STATE' },
-          (response: TranslationStateSnapshot) => {
-            if (chrome.runtime?.lastError || !response) return;
-
-            if (response.phase === 'ready') {
-              setState('ready');
-              setStatusMessage(response.message || `Subtitles ready (${response.translatedCount} cues)`);
-            } else if (response.phase === 'partial') {
-              setState('partial');
-              setStatusMessage(response.message || `Partial subtitles (${response.translatedCount}/${response.totalCount})`);
-            } else if (response.phase === 'translating' || response.phase === 'extracting') {
-              setState('working');
-              setStatusMessage(response.message || 'Translating subtitles…');
-            } else if (response.phase === 'error') {
-              setState('error');
-              setStatusMessage(response.error || response.message || 'Translation error');
-            }
-          }
-        );
-      });
-    }
-
-    // 3. Listen for real-time status broadcasts from content script
-    const messageListener = (msg: any) => {
-      if (msg?.type !== 'POPUP_STATUS_UPDATE') return;
-      setStatusMessage(msg.message || '');
-      if (msg.isError) {
-        setState('error');
-      } else if (msg.isReady) {
-        setState('ready');
-      } else {
-        setState('working');
-      }
+    const controller = new PopupController(new PopupRuntimeClient());
+    controllerRef.current = controller;
+    const unsubscribe = controller.subscribe((next) => {
+      setDomainState(next);
+      setStatusMessage(next.message || next.providerMessage || '');
+      setState(
+        next.status === 'completed' ? 'ready' :
+        next.status === 'partially-completed' ? 'partial' :
+        next.status === 'failed' || next.status === 'unavailable' ? 'error' :
+        next.status === 'translating' || next.status === 'loading-captions' ? 'working' : 'idle',
+      );
+      setSettings((current) => ({ ...current, autoTranslate: next.subtitlesEnabled }));
+    });
+    void controller.start();
+    return () => {
+      unsubscribe();
+      controller.dispose();
+      controllerRef.current = null;
     };
-
-    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-      chrome.runtime.onMessage.addListener(messageListener);
-      return () => chrome.runtime.onMessage.removeListener(messageListener);
-    }
   }, []);
 
   const handleSettingChange = <K extends keyof ExtensionSettings>(
@@ -222,77 +193,39 @@ export const App: React.FC = () => {
   ) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     saveSettings({ [key]: value });
-  };
-
-  const sendToActiveTab = (message: any, callback?: (response: any) => void) => {
-    if (typeof chrome === 'undefined' || !chrome.tabs) {
-      callback?.(null);
-      return;
+    const displayPatch =
+      key === 'subtitleBackgroundOpacity' ? { backgroundOpacity: Number(value) } :
+      key === 'subtitleSyncOffsetMs' ? { syncOffsetMs: Number(value) } :
+      key === 'subtitleBilingual' ? { mode: (value ? 'bilingual' : 'translated') as 'bilingual' | 'translated' } :
+      null;
+    if (displayPatch) {
+      void controllerRef.current?.updateSubtitleSettings(displayPatch).catch(() => {});
     }
-
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const activeTab = tabs[0];
-      if (!activeTab?.id) {
-        setState('error');
-        setStatusMessage('Open a YouTube video first.');
-        return;
-      }
-
-      chrome.tabs.sendMessage(activeTab.id, message, (response) => {
-        if (chrome.runtime.lastError) {
-          setState('error');
-          setStatusMessage('Refresh the YouTube video tab and try again.');
-        } else {
-          callback?.(response);
-        }
-      });
-    });
   };
 
   const handleGenerate = () => {
     setState('working');
     setStatusMessage('Preparing subtitles…');
-    sendToActiveTab({ type: 'START_TRANSLATION_NOW' }, (response) => {
-      if (response?.status) {
-        setStatusMessage(response.status);
-      }
+    const current = domainState;
+    if (!current) return;
+    void controllerRef.current?.startTranslation({
+      captionTrackId: current.selectedCaptionTrackId || current.captionTracks[0]?.id || '',
+      targetLanguage: settings.targetLanguage,
+      providerId: 'gemini',
+      modelId,
+    }).catch((error: unknown) => {
+      setState('error');
+      setStatusMessage(error instanceof Error ? error.message : 'Translation failed.');
     });
   };
 
-  const handleTestEngine = async () => {
-    setStatusMessage('Testing translation engine…');
-    try {
-      const testCues = [{ start: 0, dur: 2, text: 'Hello, world!' }];
-      const result = await translateBatch(testCues, settings, 'Test Video');
-      if (result && result[0]?.translatedText) {
-        setState('ready');
-        setStatusMessage(`Engine ready: "${result[0].translatedText}"`);
-      } else {
-        setState('error');
-        setStatusMessage('No translation returned from engine.');
-      }
-    } catch (err: any) {
-      setState('error');
-      setStatusMessage(err.message || 'Engine test failed.');
-    }
+  const handleTestEngine = () => {
+    setStatusMessage('Select Gemini and start translation from the active YouTube video.');
   };
 
-  // Compute privacy badge text based on configured provider
+  // Stable V1 uses one provider route. Credentials remain background-only.
   const getPrivacyText = () => {
-    switch (settings.provider) {
-      case 'youtube':
-        return { label: 'YouTube Captions', desc: 'Captions retrieved from YouTube.' };
-      case 'builtin':
-        return { label: 'On-Device AI', desc: 'Translation runs inside your browser.' };
-      case 'ollama':
-        return { label: 'Local Ollama', desc: 'Sent to your local Ollama endpoint.' };
-      case 'gemini':
-        return { label: 'Gemini Cloud API', desc: 'Sent to Google Gemini API.' };
-      case 'openrouter':
-        return { label: 'OpenRouter API', desc: 'Sent to configured OpenRouter API.' };
-      default:
-        return { label: 'Local processing', desc: 'Data stays on this device.' };
-    }
+    return { label: 'Gemini Cloud API', desc: 'Translation is sent to Google Gemini after explicit activation.' };
   };
 
   const privacy = getPrivacyText();
@@ -317,16 +250,12 @@ export const App: React.FC = () => {
         </button>
       </header>
 
-      {/* Built-in AI Status Banner */}
-      <section className={`notice ${builtinAvailable ? 'ok' : 'warn'}`}>
+      {/* Provider status banner */}
+      <section className="notice ok">
         <span className="status-dot" />
         <div>
-          <strong>{builtinAvailable ? 'Chrome Built-in AI is ready' : 'Built-in AI is unavailable'}</strong>
-          <p>
-            {builtinAvailable
-              ? 'Local on-device translation supported without API keys.'
-              : 'Use YouTube auto-translate or configure an API engine below.'}
-          </p>
+          <strong>Gemini translation is ready</strong>
+          <p>Translation starts only after you click Generate subtitles.</p>
         </div>
       </section>
 
@@ -399,7 +328,13 @@ export const App: React.FC = () => {
         type="button"
         aria-pressed={settings.autoTranslate}
         className={`toggle-row ${settings.autoTranslate ? 'active' : ''}`}
-        onClick={() => handleSettingChange('autoTranslate', !settings.autoTranslate)}
+        onClick={() => {
+          const enabled = !settings.autoTranslate;
+          setSettings((current) => ({ ...current, autoTranslate: enabled }));
+          void controllerRef.current?.setSubtitlesEnabled(enabled).catch((error: unknown) => {
+            setStatusMessage(error instanceof Error ? error.message : 'Could not update subtitles.');
+          });
+        }}
       >
         <span>
           <Captions />
@@ -660,24 +595,29 @@ export const App: React.FC = () => {
                 value={settings.provider}
                 onChange={(e) => handleSettingChange('provider', e.target.value as any)}
               >
-                <option value="youtube">YouTube Synchronized Captions (Free & Instant)</option>
-                <option value="builtin">Chrome Built-in AI (Free & Local)</option>
                 <option value="gemini">Google Gemini API</option>
-                <option value="ollama">Local Ollama</option>
-                <option value="openrouter">OpenRouter API</option>
               </select>
             </label>
 
             {settings.provider === 'gemini' && (
-              <label>
-                Gemini API Key
-                <input
-                  type="password"
-                  placeholder="AIzaSy..."
-                  value={settings.apiKey}
-                  onChange={(e) => handleSettingChange('apiKey', e.target.value)}
-                />
-              </label>
+              <>
+                <label>
+                  Gemini model
+                  <select aria-label="Gemini model" value={modelId} onChange={(e) => setModelId(e.target.value)}>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                  </select>
+                </label>
+                <label>
+                  Gemini API Key
+                  <input
+                    type="password"
+                    placeholder="AIzaSy..."
+                    value={settings.apiKey}
+                    onChange={(e) => handleSettingChange('apiKey', e.target.value)}
+                  />
+                </label>
+              </>
             )}
 
             {settings.provider === 'ollama' && (

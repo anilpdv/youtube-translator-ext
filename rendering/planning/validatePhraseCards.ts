@@ -1,4 +1,6 @@
 import type { SubtitlePhraseCard } from '../domain/SubtitlePhraseCard';
+import type { SubtitlePhraseCardPlannerOptions } from './SubtitlePhraseCardPlanner';
+import { countReadingUnits } from './joinCaptionUnits';
 
 const normalizeWords = (text: string): string[] =>
   text
@@ -16,7 +18,10 @@ export function hasLargeTextOverlap(previous: string, next: string): boolean {
   return previousWords.join(' ').includes(prefix);
 }
 
-export function validatePhraseCards(cards: readonly SubtitlePhraseCard[]): void {
+export function validatePhraseCards(
+  cards: readonly SubtitlePhraseCard[],
+  options?: Pick<SubtitlePhraseCardPlannerOptions, 'maximumLines' | 'maximumWordsPerCard'>,
+): void {
   let previousEnd = -1;
   const ids = new Set<string>();
 
@@ -24,6 +29,13 @@ export function validatePhraseCards(cards: readonly SubtitlePhraseCard[]): void 
     const card = cards[index];
     if (!card.id || ids.has(card.id)) throw new Error(`Invalid duplicate phrase card id: ${card.id}`);
     if (card.endMs <= card.startMs) throw new Error(`Invalid phrase card timing: ${card.id}`);
+    const lineCount = card.originalText.split('\n').filter(Boolean).length;
+    if (options && lineCount > options.maximumLines) {
+      throw new Error(`Phrase card exceeds line limit: ${card.id}`);
+    }
+    if (options && countReadingUnits(card.originalText) > options.maximumWordsPerCard) {
+      throw new Error(`Phrase card exceeds word limit: ${card.id}`);
+    }
     if (card.startMs < previousEnd) throw new Error(`Overlapping phrase card: ${card.id}`);
     if (index > 0 && hasLargeTextOverlap(cards[index - 1].originalText, card.originalText)) {
       throw new Error(`Phrase card repeats previous text: ${card.id}`);

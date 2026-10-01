@@ -25,6 +25,7 @@ export class TranslationGateway {
     try {
       return await provider.translateBatch(message.batch, {
         sessionId: message.sessionId,
+        videoId: message.videoId,
         sourceLanguage: message.sourceLanguage,
         targetLanguage: message.targetLanguage,
         modelId: message.modelId,
