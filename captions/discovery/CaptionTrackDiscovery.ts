@@ -35,6 +35,14 @@ export class CaptionTrackDiscovery {
         message: 'No usable caption tracks were found.',
       });
     }
+    console.info('[AI Subtitles][CaptionDebug] discovered tracks', tracks.map((track) => ({
+      id: track.id,
+      languageCode: track.languageCode,
+      kind: track.kind,
+      isDefault: track.isDefault,
+      isTranslatable: track.isTranslatable,
+      url: describeTrackUrl(track.baseUrl),
+    })));
     return tracks;
   }
 
@@ -73,5 +81,26 @@ export class CaptionTrackDiscovery {
       .join('')
       .trim();
     return text || null;
+  }
+}
+
+function describeTrackUrl(input: string): Record<string, unknown> {
+  try {
+    const url = new URL(input);
+    return {
+      origin: url.origin,
+      pathname: url.pathname,
+      parameterNames: [...new Set(url.searchParams.keys())].sort(),
+      language: url.searchParams.get('lang'),
+      targetLanguage: url.searchParams.get('tlang'),
+      format: url.searchParams.get('fmt'),
+      hasSignature:
+        url.searchParams.has('sig') ||
+        url.searchParams.has('signature') ||
+        url.searchParams.has('lsig'),
+      hasExpire: url.searchParams.has('expire'),
+    };
+  } catch {
+    return { invalid: true };
   }
 }

@@ -351,6 +351,14 @@ export class ApplicationController {
         // captionTracks[0] as its base source track; silently preferring a
         // manual track can select a different signed URL that returns empty.
         : tracks.find((track) => track.isDefault) ?? tracks[0];
+      console.info('[AI Subtitles][CaptionDebug] selected track', {
+        requestedTrackId: input.captionTrackId ?? null,
+        selectedTrackId: selected?.id ?? null,
+        selectedLanguageCode: selected?.languageCode ?? null,
+        selectedKind: selected?.kind ?? null,
+        selectedIsDefault: selected?.isDefault ?? null,
+        availableTrackCount: tracks.length,
+      });
       if (!selected) throw new ApplicationError({
         code: 'CAPTIONS_NOT_FOUND', title: 'Captions unavailable',
         message: 'No caption track is available for this video.', retryable: false,

@@ -15,6 +15,14 @@ export class CaptionFetcher {
   async fetch(track: CaptionTrack, signal?: AbortSignal): Promise<CaptionResponse> {
     signal?.throwIfAborted();
     const url = this.createCaptionUrl(track);
+    console.info('[AI Subtitles][CaptionDebug] request', {
+      trackId: track.id,
+      languageCode: track.languageCode,
+      kind: track.kind,
+      isDefault: track.isDefault,
+      formatHint: track.formatHint ?? null,
+      url: describeCaptionUrl(url),
+    });
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
       () => timeoutController.abort('Caption request timed out.'),
@@ -26,6 +34,15 @@ export class CaptionFetcher {
         method: 'GET',
         credentials: 'include',
         signal: combinedSignal,
+      });
+      console.info('[AI Subtitles][CaptionDebug] response headers', {
+        trackId: track.id,
+        status: response.status,
+        ok: response.ok,
+        redirected: response.redirected,
+        responseUrl: describeResponseUrl(response.url),
+        contentType: response.headers.get('content-type'),
+        contentLength: response.headers.get('content-length'),
       });
       if (!response.ok) {
         throw new CaptionError({
@@ -49,6 +66,11 @@ export class CaptionFetcher {
       const body = await response.text();
       signal?.throwIfAborted();
       const byteLength = new TextEncoder().encode(body).byteLength;
+      console.info('[AI Subtitles][CaptionDebug] response body', {
+        trackId: track.id,
+        bodyBytes: byteLength,
+        bodyPrefix: body.slice(0, 20).replace(/\s+/g, ' '),
+      });
       if (byteLength > this.options.limits.maxResponseBytes) {
         throw new CaptionError({
           code: 'CAPTION_RESPONSE_TOO_LARGE',
@@ -57,6 +79,12 @@ export class CaptionFetcher {
         });
       }
       if (!body.trim()) {
+        console.warn('[AI Subtitles][CaptionDebug] empty response', {
+          trackId: track.id,
+          languageCode: track.languageCode,
+          kind: track.kind,
+          url: describeCaptionUrl(url),
+        });
         throw new CaptionError({
           code: 'CAPTION_RESPONSE_EMPTY',
           message: 'YouTube returned an empty caption response.',
@@ -75,6 +103,11 @@ export class CaptionFetcher {
         }),
       };
     } catch (error) {
+      console.warn('[AI Subtitles][CaptionDebug] request failed', {
+        trackId: track.id,
+        code: error instanceof CaptionError ? error.code : 'UNKNOWN',
+        message: error instanceof Error ? error.message : String(error),
+      });
       if (error instanceof CaptionError) throw error;
       if (signal?.aborted) {
         throw new CaptionError({
@@ -153,5 +186,33 @@ export class CaptionFetcher {
       );
     }
     return controller.signal;
+  }
+}
+
+function describeCaptionUrl(input: URL | string): Record<string, unknown> {
+  const url = input instanceof URL ? input : new URL(input);
+  return {
+    origin: url.origin,
+    pathname: url.pathname,
+    language: url.searchParams.get('lang'),
+    targetLanguage: url.searchParams.get('tlang'),
+    format: url.searchParams.get('fmt'),
+    kind: url.searchParams.get('kind'),
+    hasSignature:
+      url.searchParams.has('sig') ||
+      url.searchParams.has('signature') ||
+      url.searchParams.has('lsig'),
+    hasExpire: url.searchParams.has('expire'),
+    parameterNames: [...new Set(url.searchParams.keys())].sort(),
+  };
+}
+
+function describeResponseUrl(input: string): Record<string, unknown> | null {
+  if (!input) return null;
+  try {
+    const url = new URL(input);
+    return { origin: url.origin, pathname: url.pathname };
+  } catch {
+    return { origin: null, pathname: null };
   }
 }
